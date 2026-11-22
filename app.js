@@ -98,7 +98,45 @@ function looksLikeExactAddress(q) {
   return /\d/.test(q) || (q.includes(" ") && q.length > 12);
 }
 
-async function handleAutocomplete(inputEl, suggestEl, badgeEl, onSelect) {
+const autocompleteTimers = new WeakMap();
+const autocompleteSeq = new WeakMap();
+
+function scheduleAutocomplete(inputEl, suggestEl, badgeEl, onSelect) {
+  const prev = autocompleteTimers.get(inputEl);
+  if (prev) clearTimeout(prev);
+  const seq = (autocompleteSeq.get(inputEl) || 0) + 1;
+  autocompleteSeq.set(inputEl, seq);
+
+  // Direct lokale 0ms matches tonen als die er zijn
+  const q = inputEl.value.trim();
+  if (q.length < 2) {
+    suggestEl.classList.add("hidden");
+    return;
+  }
+  const ql = q.toLowerCase();
+  const localMatches = placesCache
+    .filter((p) => p.displayName.toLowerCase().startsWith(ql))
+    .concat(placesCache.filter((p) => !p.displayName.toLowerCase().startsWith(ql) && p.displayName.toLowerCase().includes(ql)))
+    .slice(0, 6);
+
+  if (!looksLikeExactAddress(q) && localMatches.length > 0) {
+    renderSuggestions(
+      localMatches.map((p) => ({ label: `${p.displayName} · ${p.subtitle}`, point: p })),
+      suggestEl,
+      inputEl,
+      onSelect
+    );
+    return;
+  }
+
+  // Debounce live PDOK + Photon calls (250ms) zodat snel typen geen 429 of stale resultaten geeft
+  const timer = setTimeout(() => {
+    handleAutocomplete(inputEl, suggestEl, badgeEl, onSelect, seq);
+  }, 250);
+  autocompleteTimers.set(inputEl, timer);
+}
+
+async function handleAutocomplete(inputEl, suggestEl, badgeEl, onSelect, seq) {
   const q = inputEl.value.trim();
   if (q.length < 2) {
     suggestEl.classList.add("hidden");
@@ -109,42 +147,36 @@ async function handleAutocomplete(inputEl, suggestEl, badgeEl, onSelect) {
   const localMatches = placesCache
     .filter((p) => p.displayName.toLowerCase().startsWith(ql))
     .concat(placesCache.filter((p) => !p.displayName.toLowerCase().startsWith(ql) && p.displayName.toLowerCase().includes(ql)))
-    .slice(0, 6);
+    .slice(0, 4);
 
-  if (!looksLikeExactAddress(q) && localMatches.length > 0) {
-    if (badgeEl) badgeEl.textContent = "CACHE";
-    renderSuggestions(
-      localMatches.map((p) => ({ label: `${p.displayName} · ${p.subtitle}`, point: p })),
-      suggestEl,
-      inputEl,
-      onSelect
-    );
-    return;
-  }
-
-  if (badgeEl) badgeEl.textContent = "PDOK";
   try {
     const [pdokRes, photonRes] = await Promise.all([
       fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&rows=4&fq=type:(woonplaats OR postcode OR weg OR adres)`)
         .then((r) => r.json())
         .catch(() => ({})),
-      fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=52.1&lon=5.2&limit=4&lang=en`)
+      fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=52.1&lon=5.2&limit=5&lang=en`)
         .then((r) => r.json())
         .catch(() => ({})),
     ]);
 
+    if (autocompleteSeq.get(inputEl) !== seq) return;
+
     const pdokItems = (pdokRes.response?.docs || []).map((d) => ({ label: d.weergavenaam, pdokId: d.id }));
-    const photonItems = (photonRes.features || [])
-      .filter((f) => f.properties?.countrycode === "NL" && f.properties?.name)
-      .map((f) => {
-        const p = f.properties;
-        const [lon, lat] = f.geometry.coordinates;
-        const city = p.city || p.town || p.village || p.state || "Nederland";
-        return {
-          label: `${p.name} · ${city} (POI)`,
-          point: { id: `poi-${p.osm_id || p.name}`, displayName: `${p.name}, ${city}`, latitude: lat, longitude: lon },
-        };
+    const seenPoi = new Set();
+    const photonItems = [];
+    for (const f of (photonRes.features || [])) {
+      if (f.properties?.countrycode !== "NL" || !f.properties?.name) continue;
+      const p = f.properties;
+      const [lon, lat] = f.geometry.coordinates;
+      const city = p.city || p.town || p.village || p.state || "Nederland";
+      const key = `${p.name.toLowerCase()}|${city.toLowerCase()}`;
+      if (seenPoi.has(key)) continue;
+      seenPoi.add(key);
+      photonItems.push({
+        label: `${p.name} · ${city} (POI)`,
+        point: { id: `poi-${p.osm_id || p.name}`, displayName: `${p.name}, ${city}`, latitude: lat, longitude: lon },
       });
+    }
 
     const combined = [...localMatches.map((p) => ({ label: `${p.displayName} · ${p.subtitle}`, point: p })), ...photonItems, ...pdokItems].slice(0, 7);
     renderSuggestions(combined, suggestEl, inputEl, onSelect);
@@ -200,10 +232,20 @@ async function resolveTypedInputIfNeeded(inputEl, currentPoint) {
       return match;
     }
   }
+  const hasDigits = /\d/.test(q);
   const [sug, photon] = await Promise.all([
     fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&rows=1`).then((r) => r.json()).catch(() => ({})),
-    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=52.1&lon=5.2&limit=2&lang=en`).then((r) => r.json()).catch(() => ({})),
+    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=52.1&lon=5.2&limit=3&lang=en`).then((r) => r.json()).catch(() => ({})),
   ]);
+  const nlPoi = (photon.features || []).find((f) => f.properties?.countrycode === "NL" && f.properties?.name);
+  // Als er geen huisnummer/postcode in staat en Photon vindt een exacte POI, geef de POI voorrang op PDOK
+  if (!hasDigits && nlPoi && nlPoi.properties.name.toLowerCase().includes(q.toLowerCase())) {
+    const [lon, lat] = nlPoi.geometry.coordinates;
+    const city = nlPoi.properties.city || nlPoi.properties.state || "Nederland";
+    const resolved = { id: `poi-${nlPoi.properties.osm_id || q}`, displayName: `${nlPoi.properties.name}, ${city}`, latitude: lat, longitude: lon };
+    inputEl.value = resolved.displayName;
+    return resolved;
+  }
   const first = sug.response?.docs?.[0];
   if (first) {
     const resolved = await lookupPDOK(first.id);
@@ -212,7 +254,6 @@ async function resolveTypedInputIfNeeded(inputEl, currentPoint) {
       return resolved;
     }
   }
-  const nlPoi = (photon.features || []).find((f) => f.properties?.countrycode === "NL" && f.properties?.name);
   if (nlPoi) {
     const [lon, lat] = nlPoi.geometry.coordinates;
     const city = nlPoi.properties.city || nlPoi.properties.state || "Nederland";
@@ -706,9 +747,9 @@ function drawMap(routes, events) {
 // ---------------------------------------------------------------------------
 // Event Listeners
 // ---------------------------------------------------------------------------
-inputVan.addEventListener("input", () => handleAutocomplete(inputVan, suggestVan, vanBadge, (pt) => { startPoint = pt; }));
-inputVia.addEventListener("input", () => handleAutocomplete(inputVia, suggestVia, viaBadge, (pt) => { viaPoint = pt; }));
-inputNaar.addEventListener("input", () => handleAutocomplete(inputNaar, suggestNaar, naarBadge, (pt) => { endPoint = pt; }));
+inputVan.addEventListener("input", () => scheduleAutocomplete(inputVan, suggestVan, vanBadge, (pt) => { startPoint = pt; }));
+inputVia.addEventListener("input", () => scheduleAutocomplete(inputVia, suggestVia, viaBadge, (pt) => { viaPoint = pt; }));
+inputNaar.addEventListener("input", () => scheduleAutocomplete(inputNaar, suggestNaar, naarBadge, (pt) => { endPoint = pt; }));
 
 btnToggleVia.addEventListener("click", () => {
   viaGroup.classList.remove("hidden");
