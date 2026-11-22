@@ -325,24 +325,36 @@ async function fetchRoutes(start, via, end, transport) {
     }
     if (stB && (!stA || stB.id !== stA.id)) coords.push([stB.latitude, stB.longitude]);
 
-    // Voeg tussengelegen NS-stations langs elk spoorsegment toe zodat de lijn het echte spoor volgt
+    // Voeg alleen voorwaartse NS-stations (tussen 5% en 95% langs het segment, max 1.8 km zijwaarts) toe
     const detailedCoords = [[start.latitude, start.longitude]];
     const railAnchors = coords.slice(1);
     for (let i = 0; i < railAnchors.length - 1; i++) {
       const [aLat, aLon] = railAnchors[i];
       const [bLat, bLon] = railAnchors[i + 1];
       detailedCoords.push([aLat, aLon]);
-      const segLen = haversineMeters(aLat, aLon, bLat, bLon);
-      const intermediates = stations
-        .map((s) => ({
-          s,
-          dLine: pointToSegmentMeters(s.latitude, s.longitude, aLat, aLon, bLat, bLon),
-          dStart: haversineMeters(aLat, aLon, s.latitude, s.longitude),
-        }))
-        .filter((x) => x.dLine < 4500 && x.dStart > 1500 && x.dStart < segLen - 1500)
-        .sort((x, y) => x.dStart - y.dStart);
-      for (const item of intermediates) {
-        detailedCoords.push([item.s.latitude, item.s.longitude]);
+
+      const cosLat = Math.cos((aLat * Math.PI) / 180);
+      const dx = (bLon - aLon) * cosLat;
+      const dy = bLat - aLat;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq > 0) {
+        const intermediates = stations
+          .map((s) => {
+            const sx = (s.longitude - aLon) * cosLat;
+            const sy = s.latitude - aLat;
+            const t = (sx * dx + sy * dy) / lenSq;
+            const dLine = pointToSegmentMeters(s.latitude, s.longitude, aLat, aLon, bLat, bLon);
+            return { s, t, dLine };
+          })
+          .filter((x) => x.t > 0.06 && x.t < 0.94 && x.dLine < 1800)
+          .sort((x, y) => x.t - y.t);
+
+        for (const item of intermediates) {
+          const prev = detailedCoords[detailedCoords.length - 1];
+          if (haversineMeters(prev[0], prev[1], item.s.latitude, item.s.longitude) > 3000) {
+            detailedCoords.push([item.s.latitude, item.s.longitude]);
+          }
+        }
       }
     }
     if (railAnchors.length) {
