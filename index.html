@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="debrugstondopen" />
+  <title>🌉 debrugstondopen.nl — Smoes-check voor collega's</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Topbar -->
+    <header class="topbar glass">
+      <div class="topbar-left">
+        <span class="app-logo">🌉</span>
+        <div>
+          <h1>debrugstondopen.nl</h1>
+          <p class="subtitle">Smoes-check · NL Open Data</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="status-pill" class="pill glass-pill">
+          <span class="dot dot-loading"></span>
+          <span id="status-text">Data laden...</span>
+        </span>
+        <button id="btn-sources" class="btn-glass" type="button">📚 Bronnen</button>
+      </div>
+    </header>
+
+    <!-- Main 2-column Desktop Workspace -->
+    <main class="workspace">
+      <!-- Left Sidebar: 4-Velden Smoes-check -->
+      <aside class="sidebar glass">
+        <div class="sidebar-header">
+          <h2>Smoes-check</h2>
+          <p>Vul in terwijl je collega z'n jas nog ophangt.</p>
+        </div>
+
+        <!-- 1. Van -->
+        <div class="field-group">
+          <div class="label-row">
+            <label for="input-van">1. VAN (VERTREK COLLEGA)</label>
+            <button id="btn-toggle-via" class="link-btn" type="button">+ Via toevoegen</button>
+          </div>
+          <div class="input-wrap glass-input">
+            <span class="input-icon">📍</span>
+            <input id="input-van" type="text" value="Utrecht Centraal" placeholder="Plaats, station of adres..." autocomplete="off" />
+          </div>
+          <div id="suggest-van" class="suggestions hidden"></div>
+        </div>
+
+        <!-- Optioneel Via (uitklapbaar) -->
+        <div id="via-group" class="field-group hidden">
+          <div class="label-row">
+            <label for="input-via">VIA (OPTIONEEL)</label>
+            <button id="btn-clear-via" class="link-btn" type="button">✕ Verwijder</button>
+          </div>
+          <div class="input-wrap glass-input">
+            <span class="input-icon">↪️</span>
+            <input id="input-via" type="text" value="" placeholder="Bijv. Den Haag of Amersfoort..." autocomplete="off" />
+          </div>
+          <div id="suggest-via" class="suggestions hidden"></div>
+        </div>
+
+        <!-- 2. Naar -->
+        <div class="field-group">
+          <label for="input-naar">2. NAAR (KANTOOR / HIER)</label>
+          <div class="input-wrap glass-input">
+            <span class="input-icon">🏢</span>
+            <input id="input-naar" type="text" value="Amersfoort Centraal" placeholder="Bestemming..." autocomplete="off" />
+            <button id="btn-gps-naar" class="gps-btn mobile-only" type="button" title="Gebruik huidige locatie">📍</button>
+          </div>
+          <div id="suggest-naar" class="suggestions hidden"></div>
+        </div>
+
+        <!-- Aankomsttijd: Nu vs Andere datum/tijd -->
+        <div class="field-group">
+          <label>AANKOMSTTIJD</label>
+          <div id="time-mode-group" class="time-buttons">
+            <button type="button" class="time-btn active" data-timemode="now">🕐 Nu</button>
+            <button type="button" class="time-btn" data-timemode="custom">📅 Andere datum/tijd</button>
+          </div>
+        </div>
+
+        <div id="custom-time-row" class="field-row hidden">
+          <div class="field-group half">
+            <label for="input-date">DATUM</label>
+            <input id="input-date" class="glass-input plain-input" type="date" />
+          </div>
+          <div class="field-group half">
+            <label for="input-time">BINNENGEKOMEN OM</label>
+            <input id="input-time" class="glass-input plain-input" type="time" />
+          </div>
+        </div>
+
+        <!-- 3. Vervoermiddel -->
+        <div class="field-group">
+          <label>3. VERVOERMIDDEL</label>
+          <div id="transport-group" class="segmented">
+            <button type="button" class="seg-btn active" data-transport="auto">🚗 Auto</button>
+            <button type="button" class="seg-btn" data-transport="ov">🚆 OV</button>
+            <button type="button" class="seg-btn" data-transport="fiets">🚲 Fiets</button>
+            <button type="button" class="seg-btn" data-transport="lopend">🚶 Lopend</button>
+          </div>
+        </div>
+
+        <!-- 4. De Smoes -->
+        <div class="field-group">
+          <label>4. DE SMOES VAN JE COLLEGA</label>
+          <div id="excuse-chips" class="chips">
+            <button type="button" class="chip active" data-excuse="brugOpen" data-modes="auto,ov,fiets,lopend">🌉 Brug stond open</button>
+            <button type="button" class="chip" data-excuse="file" data-modes="auto">🚗 File / Drukte</button>
+            <button type="button" class="chip" data-excuse="wegwerkzaamheden" data-modes="auto,fiets">🚧 Wegwerkzaamheden</button>
+            <button type="button" class="chip" data-excuse="ongeluk" data-modes="auto,fiets">🚨 Ongeluk / 112</button>
+            <button type="button" class="chip" data-excuse="treinStoring" data-modes="ov">🚆 Trein vertraagd</button>
+            <button type="button" class="chip" data-excuse="ovUitval" data-modes="ov">🚌 Bus / Tram uitgevallen</button>
+            <button type="button" class="chip" data-excuse="pont" data-modes="auto,ov,fiets,lopend">⛴️ Pont voer niet</button>
+            <button type="button" class="chip" data-excuse="weer" data-modes="fiets,lopend">💨 Tegenwind / Regen</button>
+            <button type="button" class="chip" data-excuse="storm" data-modes="auto,ov,fiets,lopend">⛈️ Storm / Code Geel</button>
+            <button type="button" class="chip" data-excuse="overig" data-modes="auto,ov,fiets,lopend">🤷 Overig</button>
+          </div>
+        </div>
+
+        <button id="btn-check" class="btn-primary" type="button">
+          🔍 Check de feiten
+        </button>
+
+        <p class="privacy-note">🔒 Anonieme check · Geen namen of zoekopdrachten opgeslagen</p>
+      </aside>
+
+      <!-- Right Dashboard: Map + Verdict + Alibi-menu -->
+      <section class="dashboard">
+        <div class="mobile-back-row mobile-only">
+          <button id="btn-mobile-back" class="btn-glass" type="button">← Nieuwe check / Pas aan</button>
+        </div>
+        <div class="map-card glass">
+          <div id="map"></div>
+          <div class="map-overlay-top">
+            <span id="route-pill" class="glass-pill">🗺️ Route berekenen...</span>
+            <span id="sensor-pill" class="glass-pill">📡 Sensordekking: —</span>
+          </div>
+        </div>
+
+        <div class="bottom-grid">
+          <article id="verdict-card" class="card glass">
+            <div class="verdict-top">
+              <span id="verdict-badge" class="verdict-badge glass-pill">
+                <span id="verdict-dot" class="dot"></span>
+                <span id="verdict-badge-text">Klaar voor check</span>
+              </span>
+              <span id="checked-at" class="muted-small"></span>
+            </div>
+            <h2 id="verdict-headline">Kies een vertreklocatie en klik op Check</h2>
+            <p id="verdict-body" class="verdict-body">
+              We controleren realtime open data van Rijkswaterstaat, NDW, NS, OVapi, P2000 en Open-Meteo langs de route.
+            </p>
+            <div id="nee-maar-box" class="nee-maar hidden">
+              <div class="nee-maar-title">💡 "Nee, maar..." Counter</div>
+              <p id="nee-maar-text"></p>
+            </div>
+          </article>
+
+          <article class="card glass">
+            <h3 class="alibi-title">🎯 Het Alibi-menu</h3>
+            <p id="alibi-subtitle" class="muted-small hidden">Vraag je collega maar eens:</p>
+            <div id="alibi-list" class="alibi-list">
+              <p class="muted-small">Nog geen alternatieve oorzaken geladen.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal 1: Eerste-keer Fun Disclaimer -->
+  <div id="disclaimer-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal glass">
+      <h2>🌉 Even voor de duidelijkheid...</h2>
+      <p>
+        <strong>De brug stond open</strong> is bedoeld als een luchtige, grappige fact-check voor op kantoor of onder vrienden.
+      </p>
+      <p>
+        We doen ons uiterste best om alle open data van o.a. Rijkswaterstaat, NDW en NS zo accuraat mogelijk weer te geven, maar we geven <strong>geen garanties</strong> op volledigheid of realtime nauwkeurigheid (zo ontbreken kleine gemeentelijke bruggen soms in de landelijke feeds).
+      </p>
+      <p>
+        Gebruik deze site dus vooral met een knipoog bij het koffiezetapparaat—<strong>niet</strong> voor formele beoordelingen, verzuimregistratie of juridische bewijsvoering.
+      </p>
+      <div class="modal-actions">
+        <button id="btn-accept-disclaimer" class="btn-primary" type="button">
+          Begrepen, check de feiten!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Gebruikte Open Data Bronnen -->
+  <div id="sources-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal glass modal-wide">
+      <div class="modal-header">
+        <h2>📚 Gebruikte Open Data & API's</h2>
+        <button id="btn-close-sources" class="btn-glass" type="button">Sluiten</button>
+      </div>
+      <p class="muted-small">
+        Alle meldingen worden elke minuut anoniem verzameld via onze Google Cloud-backend (<code>europe-west4</code>) en gecombineerd met live route- en locatie-API's:
+      </p>
+      <ul class="sources-list">
+        <li><strong>NDW / Rijkswaterstaat (DATEX II):</strong> Actuele brugopeningen (<code>planningsfeed_brugopeningen</code>), verkeerssnelheden, reistijden, actueel verkeersbeeld, SRTI-incidenten, afsluitingen en wegwerkzaamheden.</li>
+        <li><strong>NS API v3:</strong> Actuele en recente treinverstoringen, spoorwegovergang-storingen en NL-stations.</li>
+        <li><strong>OVapi / NDOV (GTFS-Realtime):</strong> Vertragingen en uitval van bus, tram, metro en veerdiensten.</li>
+        <li><strong>P2000 (Alarmeringen.nl RSS):</strong> Uitsluitend verkeers- en weermeldingen (medische meldingen en huisnummers worden gefilterd).</li>
+        <li><strong>Open-Meteo:</strong> Uurlijkse windkracht, windrichting (tegenwindcomponent) en neerslag per regio.</li>
+        <li><strong>PDOK Locatieserver:</strong> Woonplaatsen-index (wekelijks) en exacte Nederlandse adres- en postcode-geocoding.</li>
+        <li><strong>OSRM + PDOK BRT Achtergrondkaart:</strong> Gratis routeplanning (incl. alternatieve routes) en officiële Nederlandse kaarttegels (zonder API-key).</li>
+      </ul>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
