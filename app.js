@@ -720,31 +720,34 @@ function isNSTrajectRelevant(ev, routes) {
   const segments = (ev.title || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
   const placeTokens = [];
   for (const seg of segments) {
-    const parts = seg.split(/\s*[-–—]\s*/);
+    // Splits alleen op streepje MET spaties ("Utrecht - Driebergen-Zeist"), zodat koppeltekens in plaatsnamen heel blijven
+    const parts = seg.split(/\s+[-–—]\s+/);
     if (parts.length >= 2) {
       placeTokens.push(parts.map((p) => p.replace(/\.$/, "").trim().toLowerCase()));
     }
   }
   if (!placeTokens.length) return true;
 
-  // Zoek alle bekende stations/plaatsen die binnen 5 km van onze route liggen
+  // Zoek alle bekende stations/plaatsen die binnen 1,5 km van onze route liggen
   const routeNames = new Set();
   for (const p of placesCache) {
-    if (isWithinRouteBandwidth(p, routes, 5000)) {
-      routeNames.add(p.displayName.toLowerCase().replace(" centraal", "").trim());
-      routeNames.add(p.displayName.toLowerCase().trim());
+    if (isWithinRouteBandwidth(p, routes, 1500)) {
+      const full = p.displayName.toLowerCase().trim();
+      routeNames.add(full);
+      routeNames.add(full.replace(/\s+centraal$/, "").trim());
     }
   }
 
   for (const pair of placeTokens) {
     const matchCount = pair.filter((name) => {
-      const clean = name.replace(" centraal", "").trim();
+      const clean = name.replace(/\s+centraal$/, "").trim();
+      if (routeNames.has(clean) || routeNames.has(name)) return true;
       for (const rn of routeNames) {
-        if (rn.includes(clean) || clean.includes(rn)) return true;
+        if (rn.startsWith(clean + " ") || clean.startsWith(rn + " ")) return true;
       }
       return false;
     }).length;
-    // Beide kanten van het verstoorde traject (bijv. Utrecht én Amersfoort) liggen op onze route
+    // Beide kanten van het verstoorde traject (bijv. Utrecht én Driebergen-Zeist) liggen op onze route
     if (matchCount >= 2) return true;
   }
   return false;
