@@ -79,7 +79,7 @@ async function fetchStaticJson(filename) {
 }
 
 async function initData() {
-  const statusText = document.getElementById("status-text");
+  const statusCount = document.getElementById("status-count");
   const statusDot = document.querySelector("#status-pill .dot");
   try {
     const [placesRes, weatherRes, eventsRes, railRes] = await Promise.all([
@@ -112,7 +112,7 @@ async function initData() {
     }
 
     statusDot.className = "dot dot-green";
-    statusText.textContent = `${events2h.length} events (2u) · Live`;
+    statusCount.textContent = `${events2h.length} events (2u)`;
     syncChipsForTransport(selectedTransport);
     await previewRouteOnly();
   } catch (err) {
@@ -1142,19 +1142,42 @@ document.getElementById("btn-accept-disclaimer").addEventListener("click", () =>
 });
 
 const sourcesModal = document.getElementById("sources-modal");
-document.getElementById("btn-sources").addEventListener("click", () => sourcesModal.classList.remove("hidden"));
 document.getElementById("btn-close-sources").addEventListener("click", () => sourcesModal.classList.add("hidden"));
 sourcesModal.addEventListener("click", (e) => {
   if (e.target === sourcesModal) sourcesModal.classList.add("hidden");
 });
 
-function openStatusModal() {
+function sourceUrlForName(name) {
+  const n = name.toLowerCase();
+  if (n.includes("ns")) return "https://www.ns.nl/reisinformatie/actuele-situatie-op-het-spoor";
+  if (n.includes("ndw") || n.includes("rijkswaterstaat") || n.includes("rws")) return "https://www.rijkswaterstaat.nl/verkeersinformatie";
+  if (n.includes("ovapi") || n.includes("ndov")) return "https://www.ovapi.nl/";
+  if (n.includes("p2000")) return "https://www.alarmeringen.nl/";
+  if (n.includes("open-meteo") || n.includes("weer")) return "https://open-meteo.com/";
+  if (n.includes("pdok") || n.includes("plaatsen")) return "https://www.pdok.nl/";
+  if (n.includes("osrm")) return "https://project-osrm.org/";
+  return "https://www.ndw.nu/";
+}
+
+function sourceDescriptionForName(name) {
+  const n = name.toLowerCase();
+  if (n.includes("ns")) return "Treinstoringen, spoorwegovergangen & NS Spoorkaart (rail-nl.json)";
+  if (n.includes("ndw") || n.includes("rijkswaterstaat") || n.includes("rws")) return "Brugopeningen, files, verkeerssnelheden, incidenten & wegwerkzaamheden";
+  if (n.includes("ovapi") || n.includes("ndov")) return "Vertragingen en uitval van bus, tram, metro en veerdiensten";
+  if (n.includes("p2000")) return "112 verkeers- en weermeldingen (geanonimiseerd)";
+  if (n.includes("open-meteo") || n.includes("weer")) return "Uurlijkse windkracht, windrichting en neerslag per regio";
+  if (n.includes("pdok") || n.includes("plaatsen")) return "Woonplaatsen, stations & exacte adres-geocoding";
+  if (n.includes("osrm")) return "Gratis routeplanning (incl. alternatieve routes)";
+  return "Live open databron";
+}
+
+function openSourcesAndStatusModal() {
   const events2h = eventsCache["2h"] || [];
   const updatedEl = document.getElementById("status-updated-at");
   if (lastDataUpdateDate && !isNaN(lastDataUpdateDate.getTime())) {
-    updatedEl.textContent = `Laatste update van de server: ${lastDataUpdateDate.toLocaleString("nl-NL", { dateStyle: "medium", timeStyle: "medium" })}`;
+    updatedEl.textContent = `Laatste update: ${lastDataUpdateDate.toLocaleString("nl-NL", { dateStyle: "medium", timeStyle: "medium" })} · ${events2h.length} actieve meldingen (2u)`;
   } else {
-    updatedEl.textContent = "Laatste update: onbekend";
+    updatedEl.textContent = `Laatste update: onbekend · ${events2h.length} actieve meldingen (2u)`;
   }
 
   const counts = {};
@@ -1165,35 +1188,46 @@ function openStatusModal() {
 
   const rows = Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => ({ name, info: `${count} actieve melding(en) in de laatste 2 uur`, ok: true }));
+    .map(([name, count]) => ({
+      name,
+      info: `${count} actieve melding(en) · ${sourceDescriptionForName(name)}`,
+      url: sourceUrlForName(name),
+      ok: true,
+    }));
 
   rows.push({
     name: "Weer (Open-Meteo)",
-    info: `${weatherCache.length} uurlijkse metingen geladen (12 regio's)`,
+    info: `${weatherCache.length} uurlijkse metingen geladen · ${sourceDescriptionForName("weer")}`,
+    url: sourceUrlForName("weer"),
     ok: weatherCache.length > 0,
   });
   rows.push({
-    name: "Plaatsen, Stations & POI's",
-    info: `${placesCache.length} locaties gecacht`,
+    name: "PDOK Locaties & Spoor (GitHub Pages CDN)",
+    info: `${placesCache.length} locaties & ${railGraph ? Object.keys(railGraph).length : 0} spoorknooppunten · ${sourceDescriptionForName("pdok")}`,
+    url: sourceUrlForName("pdok"),
     ok: placesCache.length > 0,
+  });
+  rows.push({
+    name: "OSRM Routeplanner",
+    info: sourceDescriptionForName("osrm"),
+    url: sourceUrlForName("osrm"),
+    ok: true,
   });
 
   const listEl = document.getElementById("status-breakdown");
   listEl.innerHTML = "";
   for (const r of rows) {
-    const div = document.createElement("div");
-    div.className = "alibi-item";
-    div.innerHTML = `<div class="alibi-item-title"><span class="dot ${r.ok ? "dot-green" : "dot-red"}"></span> ${r.name}</div><div class="alibi-item-sub">${r.info}</div>`;
-    listEl.appendChild(div);
+    const a = document.createElement("a");
+    a.className = "alibi-item source-link-item";
+    a.href = r.url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.innerHTML = `<div class="source-link-head"><div class="alibi-item-title"><span class="dot ${r.ok ? "dot-green" : "dot-red"}"></span> ${r.name}</div><span class="source-ext">↗</span></div><div class="alibi-item-sub">${r.info}</div>`;
+    listEl.appendChild(a);
   }
-  document.getElementById("status-modal").classList.remove("hidden");
+  sourcesModal.classList.remove("hidden");
 }
 
-const statusModal = document.getElementById("status-modal");
-document.getElementById("status-pill").addEventListener("click", openStatusModal);
-document.getElementById("btn-close-status").addEventListener("click", () => statusModal.classList.add("hidden"));
-statusModal.addEventListener("click", (e) => {
-  if (e.target === statusModal) statusModal.classList.add("hidden");
-});
+document.getElementById("status-pill").addEventListener("click", openSourcesAndStatusModal);
 
 initData();
