@@ -124,15 +124,30 @@ async function handleAutocomplete(inputEl, suggestEl, badgeEl, onSelect) {
 
   if (badgeEl) badgeEl.textContent = "PDOK";
   try {
-    const res = await fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&rows=5&fq=type:(woonplaats OR postcode OR weg OR adres)`);
-    const data = await res.json();
-    const docs = data.response?.docs || [];
-    renderSuggestions(
-      docs.map((d) => ({ label: d.weergavenaam, pdokId: d.id })),
-      suggestEl,
-      inputEl,
-      onSelect
-    );
+    const [pdokRes, photonRes] = await Promise.all([
+      fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&rows=4&fq=type:(woonplaats OR postcode OR weg OR adres)`)
+        .then((r) => r.json())
+        .catch(() => ({})),
+      fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=52.1&lon=5.2&limit=4&lang=en`)
+        .then((r) => r.json())
+        .catch(() => ({})),
+    ]);
+
+    const pdokItems = (pdokRes.response?.docs || []).map((d) => ({ label: d.weergavenaam, pdokId: d.id }));
+    const photonItems = (photonRes.features || [])
+      .filter((f) => f.properties?.countrycode === "NL" && f.properties?.name)
+      .map((f) => {
+        const p = f.properties;
+        const [lon, lat] = f.geometry.coordinates;
+        const city = p.city || p.town || p.village || p.state || "Nederland";
+        return {
+          label: `${p.name} · ${city} (POI)`,
+          point: { id: `poi-${p.osm_id || p.name}`, displayName: `${p.name}, ${city}`, latitude: lat, longitude: lon },
+        };
+      });
+
+    const combined = [...localMatches.map((p) => ({ label: `${p.displayName} · ${p.subtitle}`, point: p })), ...photonItems, ...pdokItems].slice(0, 7);
+    renderSuggestions(combined, suggestEl, inputEl, onSelect);
   } catch {
     suggestEl.classList.add("hidden");
   }
@@ -185,7 +200,10 @@ async function resolveTypedInputIfNeeded(inputEl, currentPoint) {
       return match;
     }
   }
-  const sug = await fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&rows=1`).then((r) => r.json());
+  const [sug, photon] = await Promise.all([
+    fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&rows=1`).then((r) => r.json()).catch(() => ({})),
+    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=52.1&lon=5.2&limit=2&lang=en`).then((r) => r.json()).catch(() => ({})),
+  ]);
   const first = sug.response?.docs?.[0];
   if (first) {
     const resolved = await lookupPDOK(first.id);
@@ -193,6 +211,14 @@ async function resolveTypedInputIfNeeded(inputEl, currentPoint) {
       inputEl.value = resolved.displayName;
       return resolved;
     }
+  }
+  const nlPoi = (photon.features || []).find((f) => f.properties?.countrycode === "NL" && f.properties?.name);
+  if (nlPoi) {
+    const [lon, lat] = nlPoi.geometry.coordinates;
+    const city = nlPoi.properties.city || nlPoi.properties.state || "Nederland";
+    const resolved = { id: `poi-${nlPoi.properties.osm_id || q}`, displayName: `${nlPoi.properties.name}, ${city}`, latitude: lat, longitude: lon };
+    inputEl.value = resolved.displayName;
+    return resolved;
   }
   return currentPoint;
 }
@@ -240,6 +266,12 @@ async function fetchRoutes(start, via, end, transport) {
   }];
 }
 
+function isPontEvent(ev) {
+  const t = (ev.title || "").toLowerCase();
+  const s = (ev.source || "").toLowerCase();
+  return t.includes("veer") || t.includes("pont") || s.includes("veer");
+}
+
 function isEventRelevantForTransport(ev, transport) {
   // Negeer oude OVapi-events die op het tijdelijke Utrecht-middelpunt stonden
   if (ev.source === "OVapi GTFS-RT" && Math.abs(ev.latitude - 52.0907) < 0.0001 && Math.abs(ev.longitude - 5.1214) < 0.0001) {
@@ -251,13 +283,17 @@ function isEventRelevantForTransport(ev, transport) {
       ev.source === "OVapi GTFS-RT" ||
       ev.category === "brugOpen" ||
       ev.category === "weer" ||
+      isPontEvent(ev) ||
       (ev.source === "P2000" && ev.category === "spoorwegovergang")
     );
   }
   if (transport === "auto") {
+    // Auto mag alleen over autoveer/pont als die op de OSRM-autoroute ligt (OSRM driving mijdt voetveren automatisch)
+    if (isPontEvent(ev)) return true;
     return ev.source !== "NS API v3" && ev.source !== "OVapi GTFS-RT";
   }
-  // Fiets / Lopend: geen NS/OVapi en geen snelweg-reistijden
+  // Fiets / Lopend: altijd pontjes/veren en bruggen toestaan, geen NS/trein of snelweg-reistijden
+  if (isPontEvent(ev) || ev.category === "brugOpen") return true;
   return ev.source !== "NS API v3" && ev.source !== "OVapi GTFS-RT" && ev.source !== "NDW Reistijden";
 }
 
