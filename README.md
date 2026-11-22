@@ -1,4 +1,4 @@
-# 🌉 debrugstondopen.nl — *De brug stond open*
+# 🌉 debrugstaatopen.nl — *De brug stond open*
 
 > **Smoes-check voor collega's op basis van Nederlandse open data.**  
 > *Vul in waar je collega vandaan komt, hoe laat hij of zij binnenliep, het vervoermiddel en de smoes — en check binnen 5 seconden of de data in het voordeel van je collega spreekt.*
@@ -47,7 +47,7 @@ In plaats van een zware database of het opslaan van normale situaties bewaart de
 - **OSRM / Apple MapKit (`MKDirections`):** Gratis routeplanning op web (`OSRM`) en macOS/iOS (`MKDirections`).
 
 ### 3. Website (`web/`)
-- Gebouwd in pure **HTML / CSS / JavaScript** zonder build-step, klaar voor **GitHub Pages** (`web/CNAME` → `debrugstondopen.nl`).
+- Gebouwd in pure **HTML / CSS / JavaScript** zonder build-step, klaar voor **GitHub Pages** (`web/CNAME` → `debrugstaatopen.nl`).
 - **Desktop & Tablet:** 2-koloms Liquid Glass layout met automatische Light/Dark Mode.
 - **Mobiel (`<= 768px`):** Zero-scroll one-screen invoerscherm met dynamische smoezen per vervoermiddel, een `📍` GPS-knopje en een apart resultaat-scherm.
 
