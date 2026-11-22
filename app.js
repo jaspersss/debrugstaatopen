@@ -292,12 +292,47 @@ async function fetchRoutes(start, via, end, transport) {
     } catch (e) {
       console.warn("OV route fallback:", e);
     }
+    const hubNames = ["utrecht centraal", "amsterdam centraal", "rotterdam centraal", "den haag centraal", "eindhoven centraal", "arnhem centraal", "zwolle", "amsterdam zuid", "schiphol airport"];
+    const stations = placesCache.filter((p) => p.kind === "station");
+    const nearestSt = (lat, lon) => {
+      let best = null, bd = Infinity;
+      for (const s of stations) {
+        const d = (s.latitude - lat) ** 2 + (s.longitude - lon) ** 2;
+        if (d < bd) { bd = d; best = s; }
+      }
+      return best;
+    };
+    const stA = nearestSt(start.latitude, start.longitude);
+    const stB = nearestSt(end.latitude, end.longitude);
+    const coords = [[start.latitude, start.longitude]];
+    if (stA) coords.push([stA.latitude, stA.longitude]);
+    if (via) {
+      const stV = nearestSt(via.latitude, via.longitude);
+      if (stV) coords.push([stV.latitude, stV.longitude]);
+    } else if (stA && stB && haversineMeters(stA.latitude, stA.longitude, stB.latitude, stB.longitude) > 15000) {
+      // Kies eventueel een groot overstapknooppunt binnen de corridor
+      const direct = haversineMeters(stA.latitude, stA.longitude, stB.latitude, stB.longitude);
+      let bestHub = null, bestRatio = 1.25;
+      for (const h of stations.filter((s) => hubNames.includes(s.displayName.toLowerCase()))) {
+        if (h.id === stA.id || h.id === stB.id) continue;
+        const viaD = haversineMeters(stA.latitude, stA.longitude, h.latitude, h.longitude) + haversineMeters(h.latitude, h.longitude, stB.latitude, stB.longitude);
+        if (viaD / direct < bestRatio) {
+          bestRatio = viaD / direct;
+          bestHub = h;
+        }
+      }
+      if (bestHub) coords.push([bestHub.latitude, bestHub.longitude]);
+    }
+    if (stB && (!stA || stB.id !== stA.id)) coords.push([stB.latitude, stB.longitude]);
+    if (coords[coords.length - 1][0] !== end.latitude || coords[coords.length - 1][1] !== end.longitude) {
+      coords.push([end.latitude, end.longitude]);
+    }
     const distKm = haversineMeters(start.latitude, start.longitude, end.latitude, end.longitude) / 1000;
     return [{
       isPrimary: true,
       isOV: true,
       expectedMinutes: Math.max(25, distKm * 1.1 + 15),
-      coords: waypoints.map((p) => [p.latitude, p.longitude]),
+      coords,
     }];
   }
 
