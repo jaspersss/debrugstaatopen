@@ -24,6 +24,7 @@ function markDisclaimerAccepted() {
 
 // State
 let placesCache = [];
+let railGraph = {};
 let weatherCache = [];
 let eventsCache = {};
 let lastDataUpdateDate = null;
@@ -72,13 +73,25 @@ async function initData() {
   const statusText = document.getElementById("status-text");
   const statusDot = document.querySelector("#status-pill .dot");
   try {
-    const [placesRes, weatherRes, eventsRes] = await Promise.all([
+    const [placesRes, weatherRes, eventsRes, railRes] = await Promise.all([
       fetch(`${BACKEND_BASE}/places-nl.json`),
       fetch(`${BACKEND_BASE}/weather-24h.json`),
       fetch(`${BACKEND_BASE}/events-2h.json?t=${Date.now()}`),
+      fetch(`${BACKEND_BASE}/rail-nl.json`).catch(() => null),
     ]);
     placesCache = await placesRes.json();
     weatherCache = await weatherRes.json();
+    if (railRes && railRes.ok) {
+      const edges = await railRes.json();
+      const graph = {};
+      for (const e of edges) {
+        if (!graph[e.from]) graph[e.from] = [];
+        if (!graph[e.to]) graph[e.to] = [];
+        graph[e.from].push({ next: e.to, km: e.km, coords: e.coords });
+        graph[e.to].push({ next: e.from, km: e.km, coords: [...e.coords].reverse() });
+      }
+      railGraph = graph;
+    }
     const lastModHeader = eventsRes.headers.get("last-modified");
     const events2h = await eventsRes.json();
     eventsCache["2h"] = events2h;
@@ -276,11 +289,93 @@ async function resolveTypedInputIfNeeded(inputEl, currentPoint) {
 // ---------------------------------------------------------------------------
 // Route Planning (OSRM voor Auto/Fiets/Lopend, Spoor/OV-corridor voor OV)
 // ---------------------------------------------------------------------------
+function findRailShortestPath(fromCode, toCode) {
+  if (!railGraph[fromCode] || !railGraph[toCode]) return null;
+  if (fromCode === toCode) return { km: 0, coords: [] };
+  const dist = { [fromCode]: 0 };
+  const prev = {};
+  const visited = new Set();
+  const queue = [fromCode];
+
+  while (queue.length) {
+    queue.sort((a, b) => dist[a] - dist[b]);
+    const u = queue.shift();
+    if (u === toCode) break;
+    if (visited.has(u)) continue;
+    visited.add(u);
+
+    for (const edge of railGraph[u] || []) {
+      const alt = dist[u] + edge.km;
+      if (alt < (dist[edge.next] ?? Infinity)) {
+        dist[edge.next] = alt;
+        prev[edge.next] = { node: u, coords: edge.coords };
+        queue.push(edge.next);
+      }
+    }
+  }
+
+  if (!prev[toCode]) return null;
+  const segments = [];
+  let cur = toCode;
+  while (prev[cur]) {
+    segments.push(prev[cur].coords);
+    cur = prev[cur].node;
+  }
+  segments.reverse();
+  const coords = [];
+  for (const seg of segments) {
+    for (const pt of seg) {
+      if (!coords.length || coords[coords.length - 1][0] !== pt[0] || coords[coords.length - 1][1] !== pt[1]) {
+        coords.push(pt);
+      }
+    }
+  }
+  return { km: dist[toCode], coords };
+}
+
 async function fetchRoutes(start, via, end, transport) {
   const waypoints = via ? [start, via, end] : [start, end];
 
-  // Voor OV vragen we de echte treinroute (incl. tussenstations) op via onze backend (NS v3/trips)
+  // Voor OV gebruiken we primair de exacte NS Spoorkaart-geometrie (rail-nl.json)
   if (transport === "ov") {
+    const stations = placesCache.filter((p) => p.kind === "station" && p.id.startsWith("nl-station-"));
+    const nearestSt = (lat, lon) => {
+      let best = null, bd = Infinity;
+      for (const s of stations) {
+        const code = s.id.replace("nl-station-", "").toLowerCase();
+        if (!railGraph[code]) continue;
+        const d = (s.latitude - lat) ** 2 + (s.longitude - lon) ** 2;
+        if (d < bd) { bd = d; best = { st: s, code }; }
+      }
+      return best;
+    };
+
+    const sA = nearestSt(start.latitude, start.longitude);
+    const sB = nearestSt(end.latitude, end.longitude);
+    const sV = via ? nearestSt(via.latitude, via.longitude) : null;
+
+    if (sA && sB && Object.keys(railGraph).length > 0) {
+      const legs = sV ? [[sA.code, sV.code], [sV.code, sB.code]] : [[sA.code, sB.code]];
+      let totalKm = 0;
+      const fullCoords = [[start.latitude, start.longitude]];
+      let ok = true;
+      for (const [c1, c2] of legs) {
+        const res = findRailShortestPath(c1, c2);
+        if (!res) { ok = false; break; }
+        totalKm += res.km;
+        for (const pt of res.coords) fullCoords.push(pt);
+      }
+      if (ok && fullCoords.length >= 2) {
+        fullCoords.push([end.latitude, end.longitude]);
+        return [{
+          isPrimary: true,
+          isOV: true,
+          expectedMinutes: Math.max(20, totalKm * 0.85 + 15),
+          coords: fullCoords,
+        }];
+      }
+    }
+
     try {
       const qs = new URLSearchParams({
         fromLat: start.latitude,
@@ -301,8 +396,7 @@ async function fetchRoutes(start, via, end, transport) {
       console.warn("OV route fallback:", e);
     }
     const hubNames = ["utrecht centraal", "amsterdam centraal", "rotterdam centraal", "den haag centraal", "eindhoven centraal", "arnhem centraal", "zwolle", "amsterdam zuid", "schiphol airport"];
-    const stations = placesCache.filter((p) => p.kind === "station");
-    const nearestSt = (lat, lon) => {
+    const fallbackNearestSt = (lat, lon) => {
       let best = null, bd = Infinity;
       for (const s of stations) {
         const d = (s.latitude - lat) ** 2 + (s.longitude - lon) ** 2;
@@ -310,8 +404,8 @@ async function fetchRoutes(start, via, end, transport) {
       }
       return best;
     };
-    const stA = nearestSt(start.latitude, start.longitude);
-    const stB = nearestSt(end.latitude, end.longitude);
+    const stA = fallbackNearestSt(start.latitude, start.longitude);
+    const stB = fallbackNearestSt(end.latitude, end.longitude);
     const coords = [[start.latitude, start.longitude]];
     if (stA) coords.push([stA.latitude, stA.longitude]);
     if (via) {
