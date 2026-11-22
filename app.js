@@ -663,7 +663,7 @@ async function runCheck(triggeredByUser = true) {
   const bandwidthMeters =
     selectedTransport === "lopend" ? 1000 :
     selectedTransport === "fiets" ? 1500 :
-    selectedTransport === "auto" ? 2500 : 3500;
+    selectedTransport === "ov" ? 800 : 3500;
   const expectedMin = routes[0]?.expectedMinutes || 35;
   const lookbackMin = Math.max(30, Math.min(150, expectedMin + 20));
   const windowStart = new Date(arrivalDate.getTime() - lookbackMin * 60000);
