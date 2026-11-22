@@ -1,4 +1,5 @@
 const BACKEND_BASE = "https://storage.googleapis.com/de-brug-stond-open-data/data";
+const OV_ROUTE_API = "https://dbso-backend-ncyabkmr7a-ez.a.run.app/ov-route";
 const DISCLAIMER_KEY = "debrugstondopen_disclaimer_seen_v1";
 const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
 let disclaimerAcceptedSession = false;
@@ -270,8 +271,27 @@ async function resolveTypedInputIfNeeded(inputEl, currentPoint) {
 async function fetchRoutes(start, via, end, transport) {
   const waypoints = via ? [start, via, end] : [start, end];
 
-  // Voor OV tekenen we geen autoroute over de snelweg, maar een OV/spoor-corridor
+  // Voor OV vragen we de echte treinroute (incl. tussenstations) op via onze backend (NS v3/trips)
   if (transport === "ov") {
+    try {
+      const qs = new URLSearchParams({
+        fromLat: start.latitude,
+        fromLon: start.longitude,
+        toLat: end.latitude,
+        toLon: end.longitude,
+      });
+      if (via) {
+        qs.set("viaLat", via.latitude);
+        qs.set("viaLon", via.longitude);
+      }
+      const res = await fetch(`${OV_ROUTE_API}?${qs.toString()}`);
+      const data = await res.json();
+      if (data.routes?.length) {
+        return data.routes;
+      }
+    } catch (e) {
+      console.warn("OV route fallback:", e);
+    }
     const distKm = haversineMeters(start.latitude, start.longitude, end.latitude, end.longitude) / 1000;
     return [{
       isPrimary: true,
