@@ -519,6 +519,16 @@ function matchesExcuse(ev, excuse) {
   const matches = corridorEvents.filter((ev) => matchesExcuse(ev, selectedExcuse));
   const alternatives = corridorEvents.filter((ev) => !matchesExcuse(ev, selectedExcuse));
 
+function timeOfDayPunchline(arrivalDate) {
+  const mins = arrivalDate.getHours() * 60 + arrivalDate.getMinutes();
+  if (mins >= 5 * 60 && mins < 11 * 60 + 30) return "Gewoon verslapen?";
+  if (mins >= 11 * 60 + 30 && mins < 17 * 60) return "Gewoon te laat vertrokken?";
+  if (mins >= 17 * 60 && mins < 23 * 60) return "Gewoon de tijd uit het oog verloren?";
+  return "Iets te gezellig blijven hangen?";
+}
+
+  const punchline = timeOfDayPunchline(arrivalDate);
+
   let verdict;
   if (selectedExcuse === "weer") {
     verdict = checkWeatherAlibi(startPoint, endPoint, arrivalDate) || {
@@ -541,7 +551,7 @@ function matchesExcuse(ev, excuse) {
         status: "red",
         badge: "Smoes ontkracht",
         headline: "Geen storm of weeralarm",
-        body: "Er geldt geen weeralarm en de wind/neerslag in Nederland valt reuze mee. Gewoon verslapen?",
+        body: `Er geldt geen weeralarm en de wind/neerslag in Nederland valt reuze mee. ${punchline}`,
       };
     }
   } else if (selectedExcuse === "overig") {
@@ -558,7 +568,7 @@ function matchesExcuse(ev, excuse) {
         status: "red",
         badge: "Smoes ontkracht",
         headline: "Hele route brandschoon!",
-        body: `Tussen ${fmtTime(windowStart)} en ${fmtTime(arrivalDate)} zijn er binnen ${(bandwidthMeters / 1000).toFixed(1)} km van de routes geen open bruggen, files, ongelukken of storingen gevonden. Gewoon verslapen?`,
+        body: `Tussen ${fmtTime(windowStart)} en ${fmtTime(arrivalDate)} zijn er binnen ${(bandwidthMeters / 1000).toFixed(1)} km van de routes geen open bruggen, files, ongelukken of storingen gevonden. ${punchline}`,
       };
     }
   } else if (matches.length > 0) {
@@ -583,7 +593,7 @@ function matchesExcuse(ev, excuse) {
       status: "red",
       badge: "Smoes ontkracht",
       headline: `Geen ${labelMap[selectedExcuse] || "verstoringen"} op deze route`,
-      body: `Tussen ${fmtTime(windowStart)} en ${fmtTime(arrivalDate)} is er binnen ${(bandwidthMeters / 1000).toFixed(1)} km van de routes van ${startPoint.displayName} naar ${endPoint.displayName} niets gevonden. Gewoon verslapen?`,
+      body: `Tussen ${fmtTime(windowStart)} en ${fmtTime(arrivalDate)} is er binnen ${(bandwidthMeters / 1000).toFixed(1)} km van de routes van ${startPoint.displayName} naar ${endPoint.displayName} niets gevonden. ${punchline}`,
     };
   }
 
