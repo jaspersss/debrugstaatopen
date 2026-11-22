@@ -4,10 +4,17 @@ const DISCLAIMER_KEY = "debrugstondopen_disclaimer_seen_v1";
 const SITE_URL = "https://debrugstaatopen.nl";
 const urlParams = new URLSearchParams(window.location.search);
 const isKlasMode = urlParams.get("mode") === "klas" || urlParams.get("embed") === "1";
+const presetVan = (urlParams.get("van") || "").trim();
+const presetVia = (urlParams.get("via") || "").trim();
 const presetNaar = (urlParams.get("naar") || "").trim();
+const presetVervoer = (urlParams.get("vervoer") || "").trim();
+const presetSmoes = (urlParams.get("smoes") || "").trim();
+const presetTijd = (urlParams.get("tijd") || "").trim();
+const shouldAutoRun = urlParams.get("auto") === "1";
 const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
-let disclaimerAcceptedSession = isKlasMode;
+let disclaimerAcceptedSession = isKlasMode || shouldAutoRun;
 let lastShareText = "";
+let lastCheckedArrivalDate = new Date();
 
 if (isKlasMode) {
   document.body.classList.add("mode-klas");
@@ -130,17 +137,65 @@ async function initData() {
 
     statusDot.className = "dot dot-green";
     statusCount.textContent = `${events2h.length} events (2u)`;
+    if (["auto", "ov", "fiets", "lopend"].includes(presetVervoer)) {
+      selectedTransport = presetVervoer;
+      document.querySelectorAll("#transport-seg .seg-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.mode === selectedTransport);
+      });
+    }
     syncChipsForTransport(selectedTransport);
+    if (presetSmoes) {
+      const matchChip = document.querySelector(`#excuse-chips .chip[data-excuse="${CSS.escape(presetSmoes)}"]`);
+      if (matchChip) {
+        selectedExcuse = presetSmoes;
+        document.querySelectorAll("#excuse-chips .chip").forEach((c) => {
+          c.classList.toggle("active", c === matchChip);
+        });
+      }
+    }
+    if (presetTijd) {
+      const parsedTijd = new Date(presetTijd);
+      if (!isNaN(parsedTijd.getTime())) {
+        useCustomTime = true;
+        const pad = (n) => String(n).padStart(2, "0");
+        inputDate.value = `${parsedTijd.getFullYear()}-${pad(parsedTijd.getMonth() + 1)}-${pad(parsedTijd.getDate())}`;
+        inputTime.value = `${pad(parsedTijd.getHours())}:${pad(parsedTijd.getMinutes())}`;
+        btnTimeNow.classList.remove("active");
+        btnTimeCustom.classList.add("active");
+        customTimeRow.classList.remove("hidden");
+      }
+    }
+    if (presetVan) {
+      inputVan.value = presetVan;
+      const resolvedVan = await resolveQuery(presetVan);
+      if (resolvedVan) {
+        startPoint = resolvedVan;
+        inputVan.value = resolvedVan.displayName;
+      }
+    }
+    if (presetVia) {
+      viaGroup.classList.remove("hidden");
+      btnAddVia.classList.add("hidden");
+      inputVia.value = presetVia;
+      const resolvedVia = await resolveQuery(presetVia);
+      if (resolvedVia) {
+        viaPoint = resolvedVia;
+        inputVia.value = resolvedVia.displayName;
+      }
+    }
     if (presetNaar) {
-      const naarInput = document.getElementById("input-naar");
-      if (naarInput) naarInput.value = presetNaar;
+      inputNaar.value = presetNaar;
       const resolvedNaar = await resolveQuery(presetNaar);
       if (resolvedNaar) {
         endPoint = resolvedNaar;
-        if (naarInput) naarInput.value = resolvedNaar.displayName;
+        inputNaar.value = resolvedNaar.displayName;
       }
     }
-    await previewRouteOnly();
+    if (shouldAutoRun) {
+      await runCheck(true);
+    } else {
+      await previewRouteOnly();
+    }
   } catch (err) {
     statusDot.className = "dot dot-red";
     statusText.textContent = "Backend tijdelijk onbereikbaar";
@@ -694,6 +749,7 @@ async function runCheck(triggeredByUser = true) {
   const arrivalDate = useCustomTime
     ? new Date(`${inputDate.value}T${inputTime.value}:00`)
     : new Date();
+  lastCheckedArrivalDate = arrivalDate;
   const routes = await fetchRoutes(startPoint, viaPoint, endPoint, selectedTransport);
   const bandwidthMeters =
     selectedTransport === "lopend" ? 1000 :
@@ -941,10 +997,23 @@ function updateShareActions(verdict) {
 
   const vanName = startPoint?.displayName || "Vertrek";
   const naarName = endPoint?.displayName || "Bestemming";
+  const shareParams = new URLSearchParams({
+    van: vanName,
+    naar: naarName,
+    vervoer: selectedTransport,
+    smoes: selectedExcuse,
+    tijd: lastCheckedArrivalDate.toISOString(),
+    auto: "1",
+  });
+  if (viaPoint?.displayName) {
+    shareParams.set("via", viaPoint.displayName);
+  }
+  const shareUrl = `${SITE_URL}/?${shareParams.toString()}`;
+
   if (verdict.status === "green") {
-    lastShareText = `🚨 Smoes-check: Het klopt écht! Op de route ${vanName} → ${naarName} was er hinder (${verdict.headline}). Alibi goedgekeurd! Check zelf op ${SITE_URL}`;
+    lastShareText = `🚨 Smoes-check: Het klopt écht! Op de route ${vanName} → ${naarName} was er hinder (${verdict.headline}). Alibi goedgekeurd! Bekijk bewijs: ${shareUrl}`;
   } else {
-    lastShareText = `🕵️ Smoes-check: Geen open brug of vertraging gevonden op de route ${vanName} → ${naarName}... Tijd voor het Alibi-menu! Check zelf op ${SITE_URL}`;
+    lastShareText = `🕵️ Smoes-check: Geen open brug of vertraging gevonden op de route ${vanName} → ${naarName}... Tijd voor het Alibi-menu! Bekijk check: ${shareUrl}`;
   }
 
   waBtn.href = `https://wa.me/?text=${encodeURIComponent(lastShareText)}`;
