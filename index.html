@@ -6,10 +6,20 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="debrugstaatopen" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="Check binnen 3 seconden met live NL open data of die brug écht open stond, of er file was of de trein vertraging had." />
+  <meta property="og:title" content="debrugstaatopen.nl — Smoes-check voor collega's" />
+  <meta property="og:description" content="Check binnen 3 seconden met live open data van Rijkswaterstaat, NDW, NS en Open-Meteo of het alibi klopt." />
+  <meta property="og:url" content="https://debrugstaatopen.nl/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://debrugstaatopen.nl/icons/og-preview.png" />
+  <meta name="twitter:card" content="summary_large_image" />
   <title>debrugstaatopen.nl — Smoes-check voor collega's</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f172a'/%3E%3Cpath d='M6 42h18v10H6zM42 42h16v10H42z' fill='%2394a3b8'/%3E%3Cpath d='M16 42V20l6-4v26' stroke='%23e2e8f0' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10 22l18 6' stroke='%23cbd5e1' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M22 42L38 14' stroke='%233b82f6' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M25 37l11-19' stroke='%2393c5fd' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M6 54q8-4 16 0t16 0 16 0' stroke='%2338bdf8' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <div class="app-shell">
@@ -171,6 +181,17 @@
               <div class="nee-maar-title">💡 "Nee, maar..." Counter</div>
               <p id="nee-maar-text"></p>
             </div>
+            <div id="share-actions" class="share-actions hidden">
+              <a id="btn-share-wa" class="btn-share btn-whatsapp" href="#" target="_blank" rel="noopener noreferrer">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                  <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.08c-.24.68-1.41 1.3-1.95 1.38-.51.08-1.15.11-1.85-.11-.43-.14-.99-.32-1.7-.63-2.99-1.29-4.94-4.31-5.09-4.51-.15-.2-1.21-1.61-1.21-3.08 0-1.47.77-2.19 1.04-2.49.27-.3.59-.38.79-.38.2 0 .4 0 .57.01.18.01.43-.07.67.51.24.59.84 2.04.91 2.19.07.15.12.33.02.53-.1.2-.15.33-.3.51-.15.18-.32.4-.45.54-.15.15-.31.31-.13.61.18.3.79 1.3 1.7 2.11 1.17 1.04 2.15 1.36 2.45 1.51.3.15.48.13.66-.08.18-.2.76-.88.96-1.18.2-.3.4-.25.67-.15.27.1 1.74.82 2.04.97.3.15.5.22.57.35.07.12.07.72-.17 1.4z"/>
+                </svg>
+                <span>Deel via WhatsApp</span>
+              </a>
+              <button id="btn-copy-proof" class="btn-share btn-copy-proof" type="button">
+                <span>📋 Kopieer bewijs</span>
+              </button>
+            </div>
           </article>
 
           <article class="card glass">
@@ -219,6 +240,13 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=14"></script>
+  <script src="app.js?v=15"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

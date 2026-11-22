@@ -746,3 +746,88 @@ a.source-link-item:hover {
     border-radius: 16px;
   }
 }
+
+/* --------------------------------------------------------------------------
+   WhatsApp / Klembord Deelknoppen
+   -------------------------------------------------------------------------- */
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.btn-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid var(--glass-stroke);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.btn-share:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btn-whatsapp {
+  background: rgba(37, 211, 102, 0.16);
+  color: #16a34a;
+  border-color: rgba(37, 211, 102, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-whatsapp {
+    color: #4ade80;
+  }
+}
+
+.btn-copy-proof {
+  background: var(--glass-bg);
+  color: var(--text);
+}
+
+/* --------------------------------------------------------------------------
+   PowerPoint & Digibord-modus (?mode=klas / ?embed=1)
+   -------------------------------------------------------------------------- */
+body.mode-klas .topbar,
+body.mode-klas .privacy-note,
+body.mode-klas #share-actions,
+body.mode-klas #disclaimer-modal,
+body.mode-klas #sources-modal {
+  display: none !important;
+}
+
+body.mode-klas .app-shell {
+  padding: 14px 16px;
+  max-width: 1440px;
+}
+
+body.mode-klas #verdict-headline {
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+body.mode-klas .verdict-body {
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+body.mode-klas .alibi-title {
+  font-size: 19px;
+}
+
+body.mode-klas .alibi-item-title {
+  font-size: 15px;
+}
+
+body.mode-klas .alibi-item-sub {
+  font-size: 13.5px;
+}

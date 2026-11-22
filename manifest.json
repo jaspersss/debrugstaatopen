@@ -1,0 +1,25 @@
+{
+  "name": "De brug staat open — Smoes-check",
+  "short_name": "Brug Open?",
+  "description": "Check binnen 3 seconden met live NL open data of de brug écht open stond, of er file was of de trein vertraging had.",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "nl",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

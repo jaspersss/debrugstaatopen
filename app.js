@@ -1,8 +1,23 @@
 const BACKEND_BASE = "https://storage.googleapis.com/de-brug-stond-open-data/data";
 const OV_ROUTE_API = "https://dbso-backend-ncyabkmr7a-ez.a.run.app/ov-route";
 const DISCLAIMER_KEY = "debrugstondopen_disclaimer_seen_v1";
+const SITE_URL = "https://debrugstaatopen.nl";
+const urlParams = new URLSearchParams(window.location.search);
+const isKlasMode = urlParams.get("mode") === "klas" || urlParams.get("embed") === "1";
+const presetNaar = (urlParams.get("naar") || "").trim();
 const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
-let disclaimerAcceptedSession = false;
+let disclaimerAcceptedSession = isKlasMode;
+let lastShareText = "";
+
+if (isKlasMode) {
+  document.body.classList.add("mode-klas");
+  const subEl = document.querySelector(".sidebar-header p");
+  if (subEl) subEl.textContent = "Vul in terwijl de leerling z'n tas nog uitpakt.";
+  const lblVan = document.querySelector('label[for="input-van"]');
+  if (lblVan) lblVan.textContent = "1. VAN (VERTREK LEERLING)";
+  const lblSmoes = document.querySelector("#excuse-chips")?.previousElementSibling;
+  if (lblSmoes) lblSmoes.textContent = "4. DE SMOES VAN DE LEERLING";
+}
 
 function hasAcceptedDisclaimer() {
   if (disclaimerAcceptedSession) return true;
@@ -114,6 +129,15 @@ async function initData() {
     statusDot.className = "dot dot-green";
     statusCount.textContent = `${events2h.length} events (2u)`;
     syncChipsForTransport(selectedTransport);
+    if (presetNaar) {
+      const naarInput = document.getElementById("input-naar");
+      if (naarInput) naarInput.value = presetNaar;
+      const resolvedNaar = await resolveQuery(presetNaar);
+      if (resolvedNaar) {
+        endPoint = resolvedNaar;
+        if (naarInput) naarInput.value = resolvedNaar.displayName;
+      }
+    }
     await previewRouteOnly();
   } catch (err) {
     statusDot.className = "dot dot-red";
@@ -904,6 +928,25 @@ function formatHumanEvent(ev) {
   return { displayTitle, sub };
 }
 
+function updateShareActions(verdict) {
+  const shareBox = document.getElementById("share-actions");
+  const waBtn = document.getElementById("btn-share-wa");
+  const copyBtn = document.getElementById("btn-copy-proof");
+  if (!shareBox || !waBtn || !copyBtn) return;
+
+  const vanName = startPoint?.displayName || "Vertrek";
+  const naarName = endPoint?.displayName || "Bestemming";
+  if (verdict.status === "green") {
+    lastShareText = `🚨 Smoes-check: Het klopt écht! Op de route ${vanName} → ${naarName} was er hinder (${verdict.headline}). Alibi goedgekeurd! Check zelf op ${SITE_URL}`;
+  } else {
+    lastShareText = `🕵️ Smoes-check: Geen open brug of vertraging gevonden op de route ${vanName} → ${naarName}... Tijd voor het Alibi-menu! Check zelf op ${SITE_URL}`;
+  }
+
+  waBtn.href = `https://wa.me/?text=${encodeURIComponent(lastShareText)}`;
+  copyBtn.innerHTML = `<span>📋 Kopieer bewijs</span>`;
+  shareBox.classList.remove("hidden");
+}
+
 function renderVerdict(verdict, alternatives) {
   const dot = document.getElementById("verdict-dot");
   dot.className = `dot dot-${verdict.status}`;
@@ -911,6 +954,7 @@ function renderVerdict(verdict, alternatives) {
   document.getElementById("checked-at").textContent = `Gecheckt om ${new Date().toTimeString().slice(0, 8)}`;
   document.getElementById("verdict-headline").textContent = verdict.headline;
   document.getElementById("verdict-body").textContent = verdict.body;
+  updateShareActions(verdict);
 
   const neeMaarBox = document.getElementById("nee-maar-box");
   if (verdict.status !== "green" && alternatives.length > 0) {
@@ -1048,6 +1092,7 @@ function resetVerdictToReady() {
   document.getElementById("verdict-headline").textContent = "Klik op Check de feiten";
   document.getElementById("verdict-body").textContent = "We controleren realtime open data van Rijkswaterstaat, NDW, NS, P2000 en Open-Meteo langs de gekozen route.";
   document.getElementById("nee-maar-box").classList.add("hidden");
+  document.getElementById("share-actions")?.classList.add("hidden");
   document.getElementById("alibi-subtitle").classList.add("hidden");
   document.getElementById("alibi-list").innerHTML = `<p class="muted-small">Nog geen check uitgevoerd voor deze combinatie.</p>`;
 }
@@ -1229,5 +1274,28 @@ function openSourcesAndStatusModal() {
 }
 
 document.getElementById("status-pill").addEventListener("click", openSourcesAndStatusModal);
+
+const copyProofBtn = document.getElementById("btn-copy-proof");
+if (copyProofBtn) {
+  copyProofBtn.addEventListener("click", async () => {
+    if (!lastShareText) return;
+    try {
+      await navigator.clipboard.writeText(lastShareText);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = lastShareText;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch {}
+      document.body.removeChild(ta);
+    }
+    copyProofBtn.innerHTML = `<span>✅ Gekopieerd!</span>`;
+    setTimeout(() => {
+      copyProofBtn.innerHTML = `<span>📋 Kopieer bewijs</span>`;
+    }, 2000);
+  });
+}
 
 initData();

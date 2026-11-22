@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:type="ContentApp">
+  <Id>8a4b7d92-3c1f-4e6a-9b2d-1f4e8c7a6b30</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>debrugstaatopen.nl</ProviderName>
+  <DefaultLocale>nl-NL</DefaultLocale>
+  <DisplayName DefaultValue="De brug staat open — Smoes-check" />
+  <Description DefaultValue="Check direct op het digibord of die brug echt open stond of de trein vertraging had." />
+  <IconUrl DefaultValue="https://debrugstaatopen.nl/icons/icon-192.png" />
+  <HighResolutionIconUrl DefaultValue="https://debrugstaatopen.nl/icons/icon-512.png" />
+  <SupportUrl DefaultValue="https://debrugstaatopen.nl/" />
+  <AppDomains>
+    <AppDomain>https://debrugstaatopen.nl</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Presentation" />
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://debrugstaatopen.nl/?mode=klas" />
+    <RequestedWidth>960</RequestedWidth>
+    <RequestedHeight>600</RequestedHeight>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+</OfficeApp>
