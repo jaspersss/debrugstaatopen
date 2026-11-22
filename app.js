@@ -1150,7 +1150,7 @@ sourcesModal.addEventListener("click", (e) => {
 function sourceUrlForName(name) {
   const n = name.toLowerCase();
   if (n.includes("ns")) return "https://www.ns.nl/reisinformatie/actuele-situatie-op-het-spoor";
-  if (n.includes("ndw") || n.includes("rijkswaterstaat") || n.includes("rws")) return "https://www.rijkswaterstaat.nl/verkeersinformatie";
+  if (n.includes("ndw") || n.includes("rijkswaterstaat") || n.includes("rws")) return "https://rwsverkeersinfo.nl/";
   if (n.includes("ovapi") || n.includes("ndov")) return "https://www.ovapi.nl/";
   if (n.includes("p2000")) return "https://www.alarmeringen.nl/";
   if (n.includes("open-meteo") || n.includes("weer")) return "https://open-meteo.com/";
