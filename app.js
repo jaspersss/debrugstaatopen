@@ -15,6 +15,8 @@ if (isKlasMode) {
   if (subEl) subEl.textContent = "Vul in terwijl de leerling z'n tas nog uitpakt.";
   const lblVan = document.querySelector('label[for="input-van"]');
   if (lblVan) lblVan.textContent = "1. VAN (VERTREK LEERLING)";
+  const lblNaar = document.querySelector('label[for="input-naar"]');
+  if (lblNaar) lblNaar.textContent = "2. NAAR (SCHOOL / HIER)";
   const lblSmoes = document.querySelector("#excuse-chips")?.previousElementSibling;
   if (lblSmoes) lblSmoes.textContent = "4. DE SMOES VAN DE LEERLING";
 }
