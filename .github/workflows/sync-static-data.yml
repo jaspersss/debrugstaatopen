@@ -1,0 +1,38 @@
+name: Sync static NL data from GCS
+
+on:
+  schedule:
+    - cron: "0 4 * * 0" # Elke zondag om 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download static JSONs from GCS
+        run: |
+          mkdir -p data
+          curl -fsSL --compressed "https://storage.googleapis.com/de-brug-stond-open-data/data/places-nl.json" -o data/places-nl.json.tmp
+          curl -fsSL --compressed "https://storage.googleapis.com/de-brug-stond-open-data/data/rail-nl.json" -o data/rail-nl.json.tmp
+          python3 -c "import json; assert len(json.load(open('data/places-nl.json.tmp'))) > 1000"
+          python3 -c "import json; assert len(json.load(open('data/rail-nl.json.tmp'))) > 100"
+          mv data/places-nl.json.tmp data/places-nl.json
+          mv data/rail-nl.json.tmp data/rail-nl.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/places-nl.json data/rail-nl.json
+          if git diff --cached --quiet; then
+            echo "Geen wijzigingen in statische data."
+          else
+            git commit -m "chore: weekly sync of places-nl.json and rail-nl.json"
+            git push
+          fi

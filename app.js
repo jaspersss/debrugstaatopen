@@ -67,17 +67,26 @@ inputDate.value = nowInit.toISOString().slice(0, 10);
 inputTime.value = nowInit.toTimeString().slice(0, 5);
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 // Init: Load places-nl.json, weather-24h.json, and events-2h.json
 // ---------------------------------------------------------------------------
+async function fetchStaticJson(filename) {
+  try {
+    const localRes = await fetch(`data/${filename}`);
+    if (localRes.ok) return localRes;
+  } catch {}
+  return fetch(`${BACKEND_BASE}/${filename}`);
+}
+
 async function initData() {
   const statusText = document.getElementById("status-text");
   const statusDot = document.querySelector("#status-pill .dot");
   try {
     const [placesRes, weatherRes, eventsRes, railRes] = await Promise.all([
-      fetch(`${BACKEND_BASE}/places-nl.json`),
+      fetchStaticJson("places-nl.json"),
       fetch(`${BACKEND_BASE}/weather-24h.json`),
       fetch(`${BACKEND_BASE}/events-2h.json?t=${Date.now()}`),
-      fetch(`${BACKEND_BASE}/rail-nl.json`).catch(() => null),
+      fetchStaticJson("rail-nl.json").catch(() => null),
     ]);
     placesCache = await placesRes.json();
     weatherCache = await weatherRes.json();
