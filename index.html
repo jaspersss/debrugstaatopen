@@ -22,10 +22,10 @@
         </div>
       </div>
       <div class="topbar-right">
-        <span id="status-pill" class="pill glass-pill">
+        <button id="status-pill" class="btn-glass status-btn" type="button" title="Bekijk live datastatus">
           <span class="dot dot-loading"></span>
           <span id="status-text">Data laden...</span>
-        </span>
+        </button>
         <button id="btn-sources" class="btn-glass" type="button">📚 Bronnen</button>
       </div>
     </header>
@@ -140,7 +140,6 @@
           <div id="map"></div>
           <div class="map-overlay-top">
             <span id="route-pill" class="glass-pill">🗺️ Route berekenen...</span>
-            <span id="sensor-pill" class="glass-pill">📡 Sensordekking: —</span>
           </div>
         </div>
 
@@ -218,7 +217,19 @@
     </div>
   </div>
 
+  <!-- Modal 3: Live Datastatus -->
+  <div id="status-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal glass modal-wide">
+      <div class="modal-header">
+        <h2>🟢 Live Datastatus</h2>
+        <button id="btn-close-status" class="btn-glass" type="button">Sluiten</button>
+      </div>
+      <p id="status-updated-at" class="muted-small">Laatste update: —</p>
+      <div id="status-breakdown" class="alibi-list"></div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

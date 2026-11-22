@@ -26,6 +26,7 @@ function markDisclaimerAccepted() {
 let placesCache = [];
 let weatherCache = [];
 let eventsCache = {};
+let lastDataUpdateDate = null;
 let startPoint = { id: "ut", displayName: "Utrecht Centraal", latitude: 52.0894, longitude: 5.1100 };
 let viaPoint = null;
 let endPoint = { id: "amf", displayName: "Amersfoort Centraal", latitude: 52.1539, longitude: 5.3706 };
@@ -78,11 +79,18 @@ async function initData() {
     ]);
     placesCache = await placesRes.json();
     weatherCache = await weatherRes.json();
+    const lastModHeader = eventsRes.headers.get("last-modified");
     const events2h = await eventsRes.json();
     eventsCache["2h"] = events2h;
 
+    if (lastModHeader) {
+      lastDataUpdateDate = new Date(lastModHeader);
+    } else if (events2h.length) {
+      lastDataUpdateDate = new Date(Math.max(...events2h.map((e) => new Date(e.startedAt).getTime())));
+    }
+
     statusDot.className = "dot dot-green";
-    statusText.textContent = `${events2h.length} events (2u) · Live GCS`;
+    statusText.textContent = `${events2h.length} events (2u) · Live`;
     syncChipsForTransport(selectedTransport);
     await previewRouteOnly();
   } catch (err) {
@@ -569,7 +577,6 @@ async function runCheck(triggeredByUser = true) {
   const fmtTime = (d) => d.toTimeString().slice(0, 5);
   const routeLabel = selectedTransport === "ov" ? "OV-corridor" : `${routes.length} route(s)`;
   document.getElementById("route-pill").textContent = `🗺️ ${routeLabel} · ${(bandwidthMeters / 1000).toFixed(1)} km bandbreedte · ${fmtTime(windowStart)} – ${fmtTime(arrivalDate)}`;
-  document.getElementById("sensor-pill").textContent = `📡 Sensordekking: 94%`;
 
   const allEvents = await getEventsForArrival(arrivalDate);
   const windowEvents = allEvents.filter((ev) => {
@@ -929,7 +936,6 @@ async function previewRouteOnly() {
   drawMap(routes, []);
   const routeLabel = selectedTransport === "ov" ? "OV-corridor" : `${routes.length} route(s)`;
   document.getElementById("route-pill").textContent = `🗺️ ${routeLabel} · klaar voor check`;
-  document.getElementById("sensor-pill").textContent = "📡 Sensordekking: 94%";
 }
 
 function resetVerdictToReady() {
@@ -1037,6 +1043,54 @@ document.getElementById("btn-sources").addEventListener("click", () => sourcesMo
 document.getElementById("btn-close-sources").addEventListener("click", () => sourcesModal.classList.add("hidden"));
 sourcesModal.addEventListener("click", (e) => {
   if (e.target === sourcesModal) sourcesModal.classList.add("hidden");
+});
+
+function openStatusModal() {
+  const events2h = eventsCache["2h"] || [];
+  const updatedEl = document.getElementById("status-updated-at");
+  if (lastDataUpdateDate && !isNaN(lastDataUpdateDate.getTime())) {
+    updatedEl.textContent = `Laatste update van de server: ${lastDataUpdateDate.toLocaleString("nl-NL", { dateStyle: "medium", timeStyle: "medium" })}`;
+  } else {
+    updatedEl.textContent = "Laatste update: onbekend";
+  }
+
+  const counts = {};
+  for (const ev of events2h) {
+    const label = humanSourceName(ev.source);
+    counts[label] = (counts[label] || 0) + 1;
+  }
+
+  const rows = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, info: `${count} actieve melding(en) in de laatste 2 uur`, ok: true }));
+
+  rows.push({
+    name: "Weer (Open-Meteo)",
+    info: `${weatherCache.length} uurlijkse metingen geladen (12 regio's)`,
+    ok: weatherCache.length > 0,
+  });
+  rows.push({
+    name: "Plaatsen, Stations & POI's",
+    info: `${placesCache.length} locaties gecacht`,
+    ok: placesCache.length > 0,
+  });
+
+  const listEl = document.getElementById("status-breakdown");
+  listEl.innerHTML = "";
+  for (const r of rows) {
+    const div = document.createElement("div");
+    div.className = "alibi-item";
+    div.innerHTML = `<div class="alibi-item-title"><span class="dot ${r.ok ? "dot-green" : "dot-red"}"></span> ${r.name}</div><div class="alibi-item-sub">${r.info}</div>`;
+    listEl.appendChild(div);
+  }
+  document.getElementById("status-modal").classList.remove("hidden");
+}
+
+const statusModal = document.getElementById("status-modal");
+document.getElementById("status-pill").addEventListener("click", openStatusModal);
+document.getElementById("btn-close-status").addEventListener("click", () => statusModal.classList.add("hidden"));
+statusModal.addEventListener("click", (e) => {
+  if (e.target === statusModal) statusModal.classList.add("hidden");
 });
 
 initData();

@@ -127,6 +127,12 @@ body {
   opacity: 0.85;
 }
 
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* Workspace Grid */
 .workspace {
   display: grid;
