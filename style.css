@@ -650,6 +650,15 @@ body {
     padding: 7px 10px;
   }
 
+  /* Voorkom automatisch inzoomen door iOS Safari bij invoervelden (< 16px) */
+  input,
+  select,
+  textarea,
+  .input-wrap input,
+  .plain-input {
+    font-size: 16px;
+  }
+
   .time-btn {
     padding: 7px 8px;
   }
