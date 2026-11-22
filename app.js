@@ -324,15 +324,39 @@ async function fetchRoutes(start, via, end, transport) {
       if (bestHub) coords.push([bestHub.latitude, bestHub.longitude]);
     }
     if (stB && (!stA || stB.id !== stA.id)) coords.push([stB.latitude, stB.longitude]);
-    if (coords[coords.length - 1][0] !== end.latitude || coords[coords.length - 1][1] !== end.longitude) {
-      coords.push([end.latitude, end.longitude]);
+
+    // Voeg tussengelegen NS-stations langs elk spoorsegment toe zodat de lijn het echte spoor volgt
+    const detailedCoords = [[start.latitude, start.longitude]];
+    const railAnchors = coords.slice(1);
+    for (let i = 0; i < railAnchors.length - 1; i++) {
+      const [aLat, aLon] = railAnchors[i];
+      const [bLat, bLon] = railAnchors[i + 1];
+      detailedCoords.push([aLat, aLon]);
+      const segLen = haversineMeters(aLat, aLon, bLat, bLon);
+      const intermediates = stations
+        .map((s) => ({
+          s,
+          dLine: pointToSegmentMeters(s.latitude, s.longitude, aLat, aLon, bLat, bLon),
+          dStart: haversineMeters(aLat, aLon, s.latitude, s.longitude),
+        }))
+        .filter((x) => x.dLine < 4500 && x.dStart > 1500 && x.dStart < segLen - 1500)
+        .sort((x, y) => x.dStart - y.dStart);
+      for (const item of intermediates) {
+        detailedCoords.push([item.s.latitude, item.s.longitude]);
+      }
+    }
+    if (railAnchors.length) {
+      detailedCoords.push(railAnchors[railAnchors.length - 1]);
+    }
+    if (detailedCoords[detailedCoords.length - 1][0] !== end.latitude || detailedCoords[detailedCoords.length - 1][1] !== end.longitude) {
+      detailedCoords.push([end.latitude, end.longitude]);
     }
     const distKm = haversineMeters(start.latitude, start.longitude, end.latitude, end.longitude) / 1000;
     return [{
       isPrimary: true,
       isOV: true,
       expectedMinutes: Math.max(25, distKm * 1.1 + 15),
-      coords,
+      coords: detailedCoords,
     }];
   }
 
@@ -542,8 +566,49 @@ async function runCheck(triggeredByUser = true) {
     return s <= arrivalDate && e >= windowStart;
   });
 
+function isNSTrajectRelevant(ev, routes) {
+  if (ev.source !== "NS API v3") return true;
+  // Als de storingstitel een of meer trajecten noemt ("Utrecht - Tiel; Utrecht - Eindhoven"),
+  // check dan of minstens één van de andere genoemde plaatsen óók langs onze route ligt
+  // (zodat "Utrecht - Tiel" niet matcht op Rotterdam -> Amersfoort).
+  const segments = (ev.title || "").split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+  const placeTokens = [];
+  for (const seg of segments) {
+    const parts = seg.split(/\s*[-–—]\s*/);
+    if (parts.length >= 2) {
+      placeTokens.push(parts.map((p) => p.replace(/\.$/, "").trim().toLowerCase()));
+    }
+  }
+  if (!placeTokens.length) return true;
+
+  // Zoek alle bekende stations/plaatsen die binnen 5 km van onze route liggen
+  const routeNames = new Set();
+  for (const p of placesCache) {
+    if (isWithinRouteBandwidth(p, routes, 5000)) {
+      routeNames.add(p.displayName.toLowerCase().replace(" centraal", "").trim());
+      routeNames.add(p.displayName.toLowerCase().trim());
+    }
+  }
+
+  for (const pair of placeTokens) {
+    const matchCount = pair.filter((name) => {
+      const clean = name.replace(" centraal", "").trim();
+      for (const rn of routeNames) {
+        if (rn.includes(clean) || clean.includes(rn)) return true;
+      }
+      return false;
+    }).length;
+    // Beide kanten van het verstoorde traject (bijv. Utrecht én Amersfoort) liggen op onze route
+    if (matchCount >= 2) return true;
+  }
+  return false;
+}
+
   const corridorEvents = windowEvents.filter(
-    (ev) => isEventRelevantForTransport(ev, selectedTransport) && isWithinRouteBandwidth(ev, routes, bandwidthMeters)
+    (ev) =>
+      isEventRelevantForTransport(ev, selectedTransport) &&
+      isWithinRouteBandwidth(ev, routes, bandwidthMeters) &&
+      isNSTrajectRelevant(ev, routes)
   );
   drawMap(routes, corridorEvents);
 
