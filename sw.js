@@ -1,8 +1,8 @@
-const CACHE_NAME = "brugopen-shell-v1";
+const CACHE_NAME = "brugopen-shell-v2";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=6",
+  "./style.css?v=7",
   "./app.js?v=15",
   "./manifest.json",
   "./icons/icon-192.png",
