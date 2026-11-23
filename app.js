@@ -1206,15 +1206,7 @@ function resetVerdictToReady() {
 }
 
 function syncChipsForTransport(mode) {
-  if (!isMobile()) {
-    // Desktop & tablet: laat altijd alle smoezen zichtbaar
-    document.querySelectorAll("#excuse-chips .chip").forEach((chip) => {
-      chip.classList.remove("hidden");
-    });
-    return;
-  }
-
-  // Mobiel: toon alleen de relevante smoezen voor dit vervoermiddel (zodat je niet hoeft te scrollen)
+  // Toon op zowel desktop als mobiel alleen de smoezen die bij het gekozen vervoermiddel passen
   const defaultByMode = { auto: "brugOpen", ov: "treinStoring", fiets: "weer", lopend: "brugOpen" };
   let activeStillVisible = false;
   document.querySelectorAll("#excuse-chips .chip").forEach((chip) => {
