@@ -1138,8 +1138,6 @@ function highlightAlibiOnMap(ev, itemEl) {
       fillOpacity: 1,
     });
     match.marker.bringToFront();
-    match.marker.openPopup();
-    map.panTo([ev.latitude, ev.longitude], { animate: true });
   }
 }
 
