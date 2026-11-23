@@ -566,23 +566,40 @@ async function fetchRoutes(start, via, end, transport) {
     }];
   }
 
-  const profile = transport === "fiets" ? "cycling" : (transport === "lopend" ? "walking" : "driving");
   const coordStr = waypoints.map((p) => `${p.longitude},${p.latitude}`).join(";");
   const alts = via ? "false" : "true";
-  const url = `https://router.project-osrm.org/route/v1/${profile}/${coordStr}?alternatives=${alts}&overview=full&geometries=geojson`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.code === "Ok" && data.routes?.length) {
-      return data.routes.slice(0, 3).map((r, idx) => ({
-        isPrimary: idx === 0,
-        isOV: false,
-        expectedMinutes: r.duration / 60,
-        coords: r.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
-      }));
+  const routingBases =
+    transport === "fiets"
+      ? [
+          "https://routing.openstreetmap.de/routed-bike/route/v1/driving",
+          "https://router.project-osrm.org/route/v1/driving",
+        ]
+      : transport === "lopend"
+      ? [
+          "https://routing.openstreetmap.de/routed-foot/route/v1/driving",
+          "https://router.project-osrm.org/route/v1/driving",
+        ]
+      : [
+          "https://router.project-osrm.org/route/v1/driving",
+          "https://routing.openstreetmap.de/routed-car/route/v1/driving",
+        ];
+
+  for (const base of routingBases) {
+    const url = `${base}/${coordStr}?alternatives=${alts}&overview=full&geometries=geojson`;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.code === "Ok" && data.routes?.length) {
+        return data.routes.slice(0, 3).map((r, idx) => ({
+          isPrimary: idx === 0,
+          isOV: false,
+          expectedMinutes: r.duration / 60,
+          coords: r.geometry.coordinates.map(([lon, lat]) => [lat, lon]),
+        }));
+      }
+    } catch (e) {
+      console.warn("OSRM route fallback:", base, e);
     }
-  } catch (e) {
-    console.warn("OSRM fallback:", e);
   }
   return [{
     isPrimary: true,

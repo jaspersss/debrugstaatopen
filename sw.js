@@ -1,9 +1,9 @@
-const CACHE_NAME = "brugopen-shell-v11";
+const CACHE_NAME = "brugopen-shell-v12";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
   "./style.css?v=10",
-  "./app.js?v=23",
+  "./app.js?v=24",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"
@@ -15,6 +15,7 @@ const NETWORK_ONLY_HOSTS = [
   "api.pdok.nl",
   "service.pdok.nl",
   "router.project-osrm.org",
+  "routing.openstreetmap.de",
   "api.open-meteo.com",
   "wa.me"
 ];
