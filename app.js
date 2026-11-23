@@ -769,12 +769,25 @@ function checkWeatherAlibi(start, end, arrivalDate) {
   const summary = `Windkracht ${bft} Bft (${Math.round(best.windSpeedKmh)} km/u, ${isHeadwind ? "tegenwind" : "zij-/meewind"}), neerslag ${best.precipitationMm.toFixed(1)} mm/u (${best.region}).`;
 
   if ((bft >= 5 && isHeadwind) || best.precipitationMm >= 2.0) {
-    return { status: "green", badge: "Alibi waterdicht", headline: "Zwaar fietsweer bevestigd", body: `${summary} Je collega heeft een punt.` };
+    const heavyHeadline =
+      selectedTransport === "fiets" ? "Zwaar fietsweer bevestigd" :
+      selectedTransport === "lopend" ? "Zwaar wandelweer bevestigd" :
+      "Flinke wind of regen op dit traject";
+    return { status: "green", badge: "Alibi waterdicht", headline: heavyHeadline, body: `${summary} Je collega heeft een punt.` };
   }
   if (bft >= 4) {
     return { status: "orange", badge: "Twijfelgeval", headline: "Matige wind, geen storm", body: `${summary} Dat verklaart hooguit een paar minuten.` };
   }
-  return { status: "red", badge: "Smoes ontkracht", headline: "Prima fietsweer op dit traject", body: `${summary} Je collega had gewoon geen zin om door te trappen.` };
+  if (selectedTransport === "fiets") {
+    return { status: "red", badge: "Smoes ontkracht", headline: "Prima fietsweer op dit traject", body: `${summary} Je collega had gewoon geen zin om door te trappen.` };
+  }
+  if (selectedTransport === "lopend") {
+    return { status: "red", badge: "Smoes ontkracht", headline: "Prima wandelweer op dit traject", body: `${summary} Je collega had gewoon geen zin om door te lopen.` };
+  }
+  if (selectedTransport === "ov") {
+    return { status: "red", badge: "Smoes ontkracht", headline: "Prima weer op dit traject", body: `${summary} En in het OV heb je sowieso geen last van tegenwind.` };
+  }
+  return { status: "red", badge: "Smoes ontkracht", headline: "Prima rijweer op dit traject", body: `${summary} En in de auto heb je sowieso een dak en geen tegenwind.` };
 }
 
 async function runCheck(triggeredByUser = true) {
