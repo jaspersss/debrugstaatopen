@@ -1093,19 +1093,36 @@ function renderVerdict(verdict, alternatives) {
       uniqueAlts.push({ ev, h });
     }
   }
+  alibiItemEntries = [];
   for (const { ev, h } of uniqueAlts.slice(0, 35)) {
     const div = document.createElement("div");
     div.className = "alibi-item";
     div.innerHTML = `<div class="alibi-item-title">${icons[ev.category] || "⚠️"} ${h.displayTitle}</div><div class="alibi-item-sub">${h.sub}</div>`;
-    div.addEventListener("click", () => highlightAlibiOnMap(ev, div));
+    div.addEventListener("click", () => highlightAlibiOnMap(ev, div, false));
     alibiList.appendChild(div);
+    alibiItemEntries.push({
+      key: `${h.displayTitle}|${humanSourceName(ev.source)}`,
+      ev,
+      el: div,
+    });
   }
 }
 
 let eventMarkers = [];
+let alibiItemEntries = [];
 
-function highlightAlibiOnMap(ev, itemEl) {
-  const wasSelected = itemEl.classList.contains("selected");
+function highlightAlibiOnMap(ev, itemEl, fromMapClick = false) {
+  let targetEl = itemEl;
+  if (!targetEl) {
+    const h = formatHumanEvent(ev);
+    const key = `${h.displayTitle}|${humanSourceName(ev.source)}`;
+    const found = alibiItemEntries.find(
+      (entry) => (ev.id && entry.ev.id === ev.id) || entry.key === key
+    );
+    targetEl = found ? found.el : null;
+  }
+
+  const wasSelected = targetEl ? targetEl.classList.contains("selected") : false;
   document.querySelectorAll("#alibi-list .alibi-item.selected").forEach((el) => el.classList.remove("selected"));
 
   for (const entry of eventMarkers) {
@@ -1118,12 +1135,18 @@ function highlightAlibiOnMap(ev, itemEl) {
     });
   }
 
-  if (wasSelected) {
+  if (wasSelected && !fromMapClick) {
     map.closePopup();
     return;
   }
 
-  itemEl.classList.add("selected");
+  if (targetEl) {
+    targetEl.classList.add("selected");
+    if (fromMapClick) {
+      targetEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+
   const match = eventMarkers.find(
     (entry) =>
       (ev.id && entry.ev.id === ev.id) ||
@@ -1183,8 +1206,9 @@ function drawMap(routes, events) {
       fillColor: defaultFill,
       fillOpacity: 0.95,
     })
-      .bindPopup(`<strong>${h.displayTitle}</strong><br/><small>${h.sub}</small>`)
+      .bindPopup(`<strong>${h.displayTitle}</strong><br/><small>${h.sub}</small>`, { autoPan: false })
       .addTo(routeLayerGroup);
+    marker.on("click", () => highlightAlibiOnMap(ev, null, true));
     eventMarkers.push({ ev, marker, defaultFill });
   }
 
