@@ -815,9 +815,13 @@ async function runCheck(triggeredByUser = true) {
   document.getElementById("route-pill").textContent = `🗺️ ${routeLabel} · ${(bandwidthMeters / 1000).toFixed(1)} km bandbreedte · ${fmtTime(windowStart)} – ${fmtTime(arrivalDate)}`;
 
   const allEvents = await getEventsForArrival(arrivalDate);
+  const staleCutoff = new Date(windowStart.getTime() - 3 * 3600000);
   const windowEvents = allEvents.filter((ev) => {
     const s = new Date(ev.startedAt);
     const e = ev.endedAt ? new Date(ev.endedAt) : new Date();
+    if (!ev.endedAt && s < staleCutoff && ev.source !== "NDW Wegwerkzaamheden" && ev.source !== "NDW Afsluitingen") {
+      return false;
+    }
     return s <= arrivalDate && e >= windowStart;
   });
 
