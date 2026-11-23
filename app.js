@@ -803,8 +803,8 @@ async function runCheck(triggeredByUser = true) {
   lastCheckedArrivalDate = arrivalDate;
   const routes = await fetchRoutes(startPoint, viaPoint, endPoint, selectedTransport);
   const bandwidthMeters =
-    selectedTransport === "lopend" ? 1000 :
-    selectedTransport === "fiets" ? 1500 :
+    selectedTransport === "lopend" ? 300 :
+    selectedTransport === "fiets" ? 500 :
     selectedTransport === "ov" ? 800 : 3500;
   const expectedMin = routes[0]?.expectedMinutes || 35;
   const lookbackMin = Math.max(30, Math.min(150, expectedMin + 20));
