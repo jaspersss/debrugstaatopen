@@ -805,7 +805,7 @@ async function runCheck(triggeredByUser = true) {
   const bandwidthMeters =
     selectedTransport === "lopend" ? 300 :
     selectedTransport === "fiets" ? 500 :
-    selectedTransport === "ov" ? 800 : 3500;
+    selectedTransport === "ov" ? 500 : 1000;
   const expectedMin = routes[0]?.expectedMinutes || 35;
   const lookbackMin = Math.max(30, Math.min(150, expectedMin + 20));
   const windowStart = new Date(arrivalDate.getTime() - lookbackMin * 60000);
