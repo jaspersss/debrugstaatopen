@@ -635,8 +635,17 @@ a.source-link-item:hover {
   }
 
   .app-shell {
-    padding: calc(10px + env(safe-area-inset-top, 0px)) 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
+    padding: calc(18px + env(safe-area-inset-top, 0px)) 12px calc(18px + env(safe-area-inset-bottom, 0px));
     gap: 10px;
+  }
+
+  body:not(.mobile-show-result) .app-shell {
+    justify-content: center;
+  }
+
+  body.mobile-show-result .app-shell {
+    justify-content: flex-start;
   }
 
   .topbar {

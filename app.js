@@ -52,6 +52,7 @@ let railGraph = {};
 let weatherCache = [];
 let eventsCache = {};
 let lastDataUpdateDate = null;
+let lastLiveFetchMs = 0;
 let startPoint = { id: "ut", displayName: "Utrecht Centraal", latitude: 52.0894, longitude: 5.1100 };
 let viaPoint = null;
 let endPoint = { id: "amf", displayName: "Amersfoort Centraal", latitude: 52.1539, longitude: 5.3706 };
@@ -128,6 +129,7 @@ async function initData() {
     const lastModHeader = eventsRes.headers.get("last-modified");
     const events2h = await eventsRes.json();
     eventsCache["2h"] = events2h;
+    lastLiveFetchMs = Date.now();
 
     if (lastModHeader) {
       lastDataUpdateDate = new Date(lastModHeader);
@@ -661,17 +663,49 @@ function isWithinRouteBandwidth(event, routes, bandwidthMeters) {
 // ---------------------------------------------------------------------------
 // Fact-Check Evaluation
 // ---------------------------------------------------------------------------
+let refreshInFlight = null;
+
+async function refreshLiveEventsIfStale(maxAgeMs) {
+  if (eventsCache["2h"] && Date.now() - lastLiveFetchMs < maxAgeMs) {
+    return;
+  }
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${BACKEND_BASE}/events-2h.json?t=${Date.now()}`);
+      if (!res.ok) return;
+      const lastModHeader = res.headers.get("last-modified");
+      const events2h = await res.json();
+      eventsCache["2h"] = events2h;
+      lastLiveFetchMs = Date.now();
+      if (lastModHeader) {
+        lastDataUpdateDate = new Date(lastModHeader);
+      } else if (events2h.length) {
+        lastDataUpdateDate = new Date(Math.max(...events2h.map((e) => new Date(e.startedAt).getTime())));
+      }
+      const statusCount = document.getElementById("status-count");
+      if (statusCount) statusCount.textContent = `${events2h.length} events (2u)`;
+    } catch {
+      // Negeer netwerkfout bij achtergrondverversing; bestaande cache blijft bruikbaar
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
 async function getEventsForArrival(arrivalDate) {
   const now = new Date();
   const diffHours = (now - arrivalDate) / 3600000;
   if (diffHours <= 2 && diffHours >= -0.2) {
-    if (!eventsCache["2h"]) {
-      eventsCache["2h"] = await fetch(`${BACKEND_BASE}/events-2h.json?t=${Date.now()}`).then((r) => r.json());
-    }
-    return eventsCache["2h"];
+    await refreshLiveEventsIfStale(5 * 60 * 1000);
+    return eventsCache["2h"] || [];
   }
   const dateStr = arrivalDate.toISOString().slice(0, 10);
-  if (!eventsCache[dateStr]) {
+  const todayStr = now.toISOString().slice(0, 10);
+  if (!eventsCache[dateStr] || (dateStr === todayStr && Date.now() - lastLiveFetchMs >= 5 * 60 * 1000)) {
     const res = await fetch(`${BACKEND_BASE}/events-${dateStr}.json?t=${Date.now()}`);
     if (res.ok) eventsCache[dateStr] = await res.json();
     else return eventsCache["2h"] || [];
@@ -1204,8 +1238,15 @@ const btnMobileBack = document.getElementById("btn-mobile-back");
 if (btnMobileBack) {
   btnMobileBack.addEventListener("click", () => {
     document.body.classList.remove("mobile-show-result");
+    refreshLiveEventsIfStale(2 * 60 * 1000);
   });
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    refreshLiveEventsIfStale(2 * 60 * 1000);
+  }
+});
 
 const btnGpsNaar = document.getElementById("btn-gps-naar");
 if (btnGpsNaar) {
