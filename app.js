@@ -1164,11 +1164,28 @@ function highlightAlibiOnMap(ev, itemEl, fromMapClick = false) {
     }
   }
 
-  const match = eventMarkers.find(
+  let match = eventMarkers.find(
     (entry) =>
       (ev.id && entry.ev.id === ev.id) ||
       (entry.ev.latitude === ev.latitude && entry.ev.longitude === ev.longitude && entry.ev.title === ev.title)
   );
+  if (!match && typeof ev.latitude === "number" && typeof ev.longitude === "number") {
+    const h = formatHumanEvent(ev);
+    const colorMap = { brugOpen: "#16a34a", file: "#d97706", treinStoring: "#dc2626", weer: "#0284c7", spoorwegovergang: "#ca8a04" };
+    const defaultFill = colorMap[ev.category] || "#64748b";
+    const marker = L.circleMarker([ev.latitude, ev.longitude], {
+      radius: 10,
+      color: "#ffffff",
+      weight: 3,
+      fillColor: "#ec4899",
+      fillOpacity: 1,
+    })
+      .bindPopup(`<strong>${h.displayTitle}</strong><br/><small>${h.sub}</small>`, { autoPan: false })
+      .addTo(routeLayerGroup);
+    marker.on("click", () => highlightAlibiOnMap(ev, null, true));
+    match = { ev, marker, defaultFill };
+    eventMarkers.push(match);
+  }
   if (match) {
     match.marker.setStyle({
       radius: 10,
