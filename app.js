@@ -1093,16 +1093,59 @@ function renderVerdict(verdict, alternatives) {
       uniqueAlts.push({ ev, h });
     }
   }
-  for (const { ev, h } of uniqueAlts.slice(0, 4)) {
+  for (const { ev, h } of uniqueAlts.slice(0, 35)) {
     const div = document.createElement("div");
     div.className = "alibi-item";
     div.innerHTML = `<div class="alibi-item-title">${icons[ev.category] || "⚠️"} ${h.displayTitle}</div><div class="alibi-item-sub">${h.sub}</div>`;
+    div.addEventListener("click", () => highlightAlibiOnMap(ev, div));
     alibiList.appendChild(div);
+  }
+}
+
+let eventMarkers = [];
+
+function highlightAlibiOnMap(ev, itemEl) {
+  const wasSelected = itemEl.classList.contains("selected");
+  document.querySelectorAll("#alibi-list .alibi-item.selected").forEach((el) => el.classList.remove("selected"));
+
+  for (const entry of eventMarkers) {
+    entry.marker.setStyle({
+      radius: 6,
+      color: "#ffffff",
+      weight: 1.5,
+      fillColor: entry.defaultFill,
+      fillOpacity: 0.95,
+    });
+  }
+
+  if (wasSelected) {
+    map.closePopup();
+    return;
+  }
+
+  itemEl.classList.add("selected");
+  const match = eventMarkers.find(
+    (entry) =>
+      (ev.id && entry.ev.id === ev.id) ||
+      (entry.ev.latitude === ev.latitude && entry.ev.longitude === ev.longitude && entry.ev.title === ev.title)
+  );
+  if (match) {
+    match.marker.setStyle({
+      radius: 10,
+      color: "#ffffff",
+      weight: 3,
+      fillColor: "#ec4899",
+      fillOpacity: 1,
+    });
+    match.marker.bringToFront();
+    match.marker.openPopup();
+    map.panTo([ev.latitude, ev.longitude], { animate: true });
   }
 }
 
 function drawMap(routes, events) {
   routeLayerGroup.clearLayers();
+  eventMarkers = [];
   const bounds = L.latLngBounds([[startPoint.latitude, startPoint.longitude], [endPoint.latitude, endPoint.longitude]]);
 
   for (const r of routes.filter((x) => !x.isPrimary)) {
@@ -1134,15 +1177,17 @@ function drawMap(routes, events) {
   const colorMap = { brugOpen: "#16a34a", file: "#d97706", treinStoring: "#dc2626", weer: "#0284c7", spoorwegovergang: "#ca8a04" };
   for (const ev of events.slice(0, 35)) {
     const h = formatHumanEvent(ev);
-    L.circleMarker([ev.latitude, ev.longitude], {
+    const defaultFill = colorMap[ev.category] || "#64748b";
+    const marker = L.circleMarker([ev.latitude, ev.longitude], {
       radius: 6,
       color: "#ffffff",
       weight: 1.5,
-      fillColor: colorMap[ev.category] || "#64748b",
+      fillColor: defaultFill,
       fillOpacity: 0.95,
     })
       .bindPopup(`<strong>${h.displayTitle}</strong><br/><small>${h.sub}</small>`)
       .addTo(routeLayerGroup);
+    eventMarkers.push({ ev, marker, defaultFill });
   }
 
   map.fitBounds(bounds.pad(0.2));

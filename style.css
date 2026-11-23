@@ -504,6 +504,9 @@ a.source-link-item:hover {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .alibi-item {
@@ -511,6 +514,17 @@ a.source-link-item:hover {
   border: 1px solid var(--glass-stroke);
   border-radius: 12px;
   padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s ease;
+}
+
+.alibi-item:hover {
+  border-color: var(--accent);
+}
+
+.alibi-item.selected {
+  border-color: #ec4899;
+  background: rgba(236, 72, 153, 0.14);
 }
 
 .alibi-item-title {
