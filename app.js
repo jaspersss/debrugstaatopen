@@ -1307,17 +1307,17 @@ function resetVerdictToReady() {
 }
 
 function syncChipsForTransport(mode) {
-  // Toon op zowel desktop als mobiel alleen de smoezen die bij het gekozen vervoermiddel passen
   const defaultByMode = { auto: "brugOpen", ov: "treinStoring", fiets: "weer", lopend: "brugOpen" };
-  let activeStillVisible = false;
+  let activeStillAllowed = false;
   document.querySelectorAll("#excuse-chips .chip").forEach((chip) => {
     const allowed = (chip.dataset.modes || "").split(",").includes(mode);
-    chip.classList.toggle("hidden", !allowed);
+    // Desktop: altijd alle 10 smoezen zichtbaar houden; Mobiel: alleen relevante smoezen tonen
+    chip.classList.toggle("hidden", isMobile() && !allowed);
     if (allowed && chip.dataset.excuse === selectedExcuse) {
-      activeStillVisible = true;
+      activeStillAllowed = true;
     }
   });
-  if (!activeStillVisible) {
+  if (!activeStillAllowed) {
     selectedExcuse = defaultByMode[mode] || "brugOpen";
     document.querySelectorAll("#excuse-chips .chip").forEach((chip) => {
       chip.classList.toggle("active", chip.dataset.excuse === selectedExcuse);
